@@ -5,10 +5,10 @@
     </div>
     <div class="welcome-stage">
       <picture>
-        <source media="(min-width: 900px)" srcset="/images/welcome-desktop.png" />
+        <source media="(min-width: 900px)" [attr.srcset]="welcomeDesktopSrc" />
         <img
           class="welcome-hero"
-          src="/images/welcome-mobile.png"
+          [src]="welcomeMobileSrc"
           [alt]="appName + ' — Save it, Forget it.'"
           width="430"
           height="932"
@@ -26,8 +26,11 @@
             <span>Create New {{ appName }}</span>
           </button>
         } @else {
-          <button class="welcome-btn welcome-btn--primary" type="button" (click)="create.emit()">
+          <button class="welcome-btn welcome-btn--primary" type="button" (click)="unlock.emit()">
             <app-icon name="lock"></app-icon>
+            <span>Unlock {{ appName }}</span>
+          </button>
+          <button class="welcome-btn welcome-btn--secondary" type="button" (click)="create.emit()">
             <span>Create {{ appName }}</span>
           </button>
         }
