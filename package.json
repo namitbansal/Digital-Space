@@ -26,9 +26,7 @@
   "devDependencies": {
     "@angular-devkit/build-angular": "^19.2.27",
     "@angular/cli": "^19.2.27",
-    "@angular/compiler-cli": "^19.2.0",
-    "@resvg/resvg-js": "^2.6.2",
-    "to-ico": "^1.1.5",
+    "@angular/compiler-cli": "^19.2.0",    
     "typescript": "~5.7.2",
     "vitest": "^3.2.4"
   }
