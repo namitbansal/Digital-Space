@@ -1,0 +1,37 @@
+<section class="welcome-screen">
+  <div class="welcome-shell">
+    <div class="welcome-guidance">
+      <app-guidance-panel guidanceId="welcome" />
+    </div>
+    <div class="welcome-stage">
+      <picture>
+        <source media="(min-width: 900px)" srcset="/images/welcome-desktop.png" />
+        <img
+          class="welcome-hero"
+          src="/images/welcome-mobile.png"
+          [alt]="appName + ' — Save it, Forget it.'"
+          width="430"
+          height="932"
+          decoding="async"
+        />
+      </picture>
+
+      <div class="welcome-actions">
+        @if (hasVault) {
+          <button class="welcome-btn welcome-btn--primary" type="button" (click)="unlock.emit()">
+            <app-icon name="lock"></app-icon>
+            <span>Unlock {{ appName }}</span>
+          </button>
+          <button class="welcome-btn welcome-btn--secondary" type="button" (click)="create.emit()">
+            <span>Create New {{ appName }}</span>
+          </button>
+        } @else {
+          <button class="welcome-btn welcome-btn--primary" type="button" (click)="create.emit()">
+            <app-icon name="lock"></app-icon>
+            <span>Create {{ appName }}</span>
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+</section>

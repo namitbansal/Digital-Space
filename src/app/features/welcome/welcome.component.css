@@ -1,0 +1,217 @@
+.welcome-screen {
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  background: #000;
+}
+
+.welcome-shell {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100dvh;
+  padding:
+    max(0px, env(safe-area-inset-top))
+    0
+    max(0px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.welcome-guidance {
+  width: 100%;
+  padding: 12px 14px 0;
+  z-index: 2;
+}
+
+.welcome-guidance .guidance-panel {
+  margin-bottom: 0;
+}
+
+.welcome-stage {
+  position: relative;
+  width: 100%;
+  max-width: 430px;
+}
+
+.welcome-hero {
+  width: 100%;
+  height: auto;
+  max-height: 100dvh;
+  object-fit: contain;
+  object-position: center top;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Mobile — buttons in the black area below tagline */
+.welcome-actions {
+  position: absolute;
+  left: 50%;
+  top: auto;
+  bottom: 5.5%;
+  height: auto;
+  z-index: 1;
+  transform: translateX(-50%);
+  width: min(88%, 360px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+
+.welcome-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 54px;
+  padding: 0 24px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.2s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.welcome-btn:active {
+  transform: scale(0.98);
+}
+
+.welcome-btn app-icon {
+  font-size: 1.1rem;
+}
+
+.welcome-btn--primary {
+  border: 0;
+  color: #fff;
+  background: linear-gradient(180deg, #4da3ff 0%, #2563eb 55%, #1d4ed8 100%);
+  box-shadow:
+    0 0 0 1px rgba(147, 197, 253, 0.35),
+    0 8px 28px rgba(37, 99, 235, 0.55),
+    0 2px 8px rgba(37, 99, 235, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.welcome-btn--primary:hover {
+  background: linear-gradient(180deg, #5eb0ff 0%, #3b82f6 55%, #2563eb 100%);
+  box-shadow:
+    0 0 0 1px rgba(147, 197, 253, 0.5),
+    0 10px 36px rgba(37, 99, 235, 0.65),
+    0 2px 10px rgba(37, 99, 235, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.welcome-btn--secondary {
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.welcome-btn--secondary:hover {
+  background: rgba(30, 41, 59, 0.75);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* Desktop — wide artwork, buttons in left black area below tagline */
+@media (min-width: 900px) {
+  .welcome-screen {
+    background: #000;
+  }
+
+  .welcome-shell {
+    position: relative;
+    max-width: none;
+    width: 100%;
+    min-height: 100dvh;
+    padding:
+      max(0px, env(safe-area-inset-top))
+      0
+      max(0px, env(safe-area-inset-bottom));
+    justify-content: center;
+  }
+
+  .welcome-guidance {
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(92%, 520px);
+    padding: 0 14px;
+  }
+
+  .welcome-stage {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+  }
+
+  .welcome-hero {
+    width: 100%;
+    max-height: 100dvh;
+  }
+
+  .welcome-actions {
+    left: 8.5%;
+    top: 70.5%;
+    bottom: auto;
+    height: auto;
+    transform: none;
+    justify-content: flex-start;
+    align-items: stretch;
+    width: min(38%, 520px);
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 14px;
+  }
+
+  .welcome-btn {
+    flex: 1 1 auto;
+    min-height: 52px;
+    font-size: 0.94rem;
+    font-weight: 700;
+    padding: 0 20px;
+    white-space: nowrap;
+  }
+
+  .welcome-btn--primary {
+    flex: 1.08;
+  }
+}
+
+@media (min-width: 1200px) {
+  .welcome-actions {
+    left: 9%;
+    top: 70%;
+    width: min(34%, 540px);
+  }
+
+  .welcome-btn {
+    min-height: 54px;
+    font-size: 0.96rem;
+  }
+}
+
+@media (min-width: 1600px) {
+  .welcome-actions {
+    left: 10%;
+    top: 69.5%;
+    width: min(30%, 560px);
+  }
+}

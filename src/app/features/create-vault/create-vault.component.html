@@ -1,0 +1,213 @@
+<section class="auth-screen">
+  @if (step === 'form') {
+    <div class="auth-card auth-card--wide">
+      <app-guidance-panel [guidanceId]="guidanceId" />
+      <h1 class="auth-brand">{{ appName }}</h1>
+      <p class="auth-sub">Create your vault</p>
+
+      <form (ngSubmit)="submit()">
+        <div class="field">
+          <label for="login-username">Username <span class="field-label__required" aria-hidden="true">*</span></label>
+          <input
+            id="login-username"
+            type="text"
+            required
+            [(ngModel)]="loginUsername"
+            name="loginUsername"
+            autocomplete="username"
+            placeholder="your_username"
+            spellcheck="false"
+            autocapitalize="off"
+            (blur)="checkUsername()"
+            autofocus
+          />
+          <p class="field-hint">{{ usernameFormatHint }}</p>
+          @if (usernameHint) {
+            <p [class]="usernameHint === usernameTakenMessage ? 'auth-error' : 'field-hint'">{{ usernameHint }}</p>
+          }
+        </div>
+        <div class="field">
+          <label for="user-name">Display name</label>
+          <input
+            id="user-name"
+            type="text"
+            required
+            [(ngModel)]="userName"
+            name="userName"
+            autocomplete="name"
+            placeholder="Your name"
+          />
+          <p class="field-hint">Shown on your home dashboard.</p>
+        </div>
+        <div class="field">
+          <label for="mp">Master password <span class="field-label__required" aria-hidden="true">*</span></label>
+          <input id="mp" type="password" required minlength="8" [(ngModel)]="password" name="password" autocomplete="new-password" />
+          <p class="field-hint">At least 8 characters.</p>
+        </div>
+        <div class="field">
+          <label for="mp2">Confirm password <span class="field-label__required" aria-hidden="true">*</span></label>
+          <input id="mp2" type="password" required minlength="8" [(ngModel)]="confirm" name="confirm" autocomplete="new-password" />
+        </div>
+        @if (error) {
+          <p class="auth-error">{{ error }}</p>
+        }
+        <div class="auth-actions auth-actions--stack">
+          <button class="btn btn--primary btn--wide" type="submit" [disabled]="busy">Continue</button>
+          <button class="btn btn--ghost btn--wide" type="button" (click)="back.emit()">Back</button>
+        </div>
+      </form>
+    </div>
+  } @else if (step === 'storage') {
+    <div class="auth-card auth-card--wide">
+      <app-guidance-panel [guidanceId]="guidanceId" />
+      <h1 class="auth-brand">{{ hints.storageChoiceTitle }}</h1>
+      <p class="auth-sub">{{ hints.storageChoiceSub }}</p>
+
+      <div class="field" role="radiogroup" aria-label="Storage option">
+        <label class="storage-choice">
+          <input type="radio" name="storageChoice" value="google" [(ngModel)]="storageChoice" />
+          <span class="storage-choice__title">
+            This device + Google Drive
+            <span class="storage-choice__badge">Recommended</span>
+          </span>
+          <span class="storage-choice__desc">{{ hints.storageGoogle }}</span>
+        </label>
+        <label class="storage-choice">
+          <input type="radio" name="storageChoice" value="device" [(ngModel)]="storageChoice" />
+          <span class="storage-choice__title">This device only</span>
+          <span class="storage-choice__desc">{{ hints.storageDevice }}</span>
+        </label>
+      </div>
+
+      <p class="field-hint">{{ hints.deviceOnlyLater }}</p>
+
+      @if (error) {
+        <p class="auth-error">{{ error }}</p>
+      }
+
+      <div class="auth-actions auth-actions--stack">
+        @if (wantsGoogleSync) {
+          <button class="btn btn--primary btn--wide" type="button" [disabled]="busy" (click)="continueFromStorage()">
+            Continue — connect Google
+          </button>
+        } @else {
+          <button class="btn btn--primary btn--wide" type="button" [disabled]="busy" (click)="continueFromStorage()">
+            Continue
+          </button>
+        }
+        <button class="btn btn--ghost btn--wide" type="button" (click)="backFromStorage()" [disabled]="busy">
+          Back
+        </button>
+      </div>
+    </div>
+  } @else if (step === 'google') {
+    <div class="auth-card auth-card--wide">
+      <app-guidance-panel [guidanceId]="guidanceId" />
+      <h1 class="auth-brand">Connect Google Drive</h1>
+      <p class="auth-sub">{{ hints.optional }}</p>
+
+      <div class="setup-guide setup-guide--soft">
+        <strong>Encrypted backup to Drive</strong>
+        <p>{{ hints.driveDocuments }}</p>
+        <p>{{ hints.connect }}</p>
+        <p class="field-hint">
+          Folder on Drive: <strong>{{ driveFolderPath }}</strong> — created automatically. Passwords, documents, and attachments are encrypted before upload.
+        </p>
+        @if (identityEmail) {
+          <p class="field-hint">Connected: <strong>{{ identityEmail }}</strong></p>
+          @if (driveVerified) {
+            <p class="settings-success">{{ hints.driveVerifiedOk }}</p>
+            <p class="field-hint">Folder: <strong>{{ driveFolderPath }}</strong></p>
+          } @else if (googleBusy || driveVerifyBusy) {
+            <p class="field-hint">{{ hints.driveVerified }}</p>
+          } @else {
+            <p class="auth-error">{{ hints.driveVerifyFailed }}</p>
+            <button class="btn btn--ghost btn--wide" type="button" [disabled]="driveVerifyBusy" (click)="verifyDriveAgain()">
+              Verify Drive access
+            </button>
+          }
+          <label class="recovery-code-confirm">
+            <input type="checkbox" [(ngModel)]="syncToDrive" name="syncToDrive" />
+            <span>Back up vault, documents, and attachments to Google Drive when online</span>
+          </label>
+        } @else {
+          <p class="field-hint">{{ hints.driveVerified }}</p>
+          <button
+            class="btn btn--primary btn--wide"
+            type="button"
+            [disabled]="googleBusy || busy || !googleConfigured || googleAuthPreparing"
+            (click)="connectGoogle()"
+          >
+            @if (googleBusy) {
+              <span>Connecting and verifying…</span>
+            } @else if (googleAuthPreparing) {
+              <span>Preparing Google sign-in…</span>
+            } @else {
+              <span>Sign in with Google</span>
+            }
+          </button>
+          @if (!googleConfigured) {
+            <p class="auth-error">
+              Google backup is not set up on this site yet. Go back and choose <strong>This device only</strong>, or ask the site owner to enable Google sign-in.
+            </p>
+          }
+        }
+      </div>
+
+      <p class="field-hint">{{ hints.deviceOnlyLater }}</p>
+
+      @if (error) {
+        <p class="auth-error">{{ error }}</p>
+      }
+
+      <div class="auth-actions auth-actions--stack">
+        <button class="btn btn--primary btn--wide" type="button" [disabled]="busy || googleBusy || !canContinueFromGoogle()" (click)="continueFromGoogle()">
+          Continue
+        </button>
+        <button class="btn btn--ghost btn--wide" type="button" (click)="backFromGoogle()" [disabled]="busy || googleBusy">
+          Back
+        </button>
+      </div>
+    </div>
+  } @else {
+    <div class="auth-card auth-card--wide">
+      <app-guidance-panel [guidanceId]="guidanceId" />
+      <h1 class="auth-brand">Save your recovery code</h1>
+      <p class="auth-sub">Last step — write this down or store it safely. You need it to reset your master password if you forget it.</p>
+
+      <div class="recovery-code-box" aria-live="polite">
+        <code class="recovery-code-box__code">{{ recoveryCode }}</code>
+      </div>
+
+      <label class="recovery-code-confirm">
+        <input type="checkbox" [(ngModel)]="savedCode" name="savedCode" />
+        <span>I have saved my recovery code in a safe place</span>
+      </label>
+
+      <div class="field">
+        <label for="verify-mp">Master password <span class="field-label__required" aria-hidden="true">*</span></label>
+        <input
+          id="verify-mp"
+          type="password"
+          [(ngModel)]="verifyPassword"
+          name="verifyPassword"
+          autocomplete="current-password"
+        />
+        <p class="field-hint">{{ hints.password }}</p>
+      </div>
+
+      @if (error) {
+        <p class="auth-error">{{ error }}</p>
+      }
+
+      <div class="auth-actions auth-actions--stack">
+        <button class="btn btn--primary btn--wide" type="button" [disabled]="!savedCode || busy" (click)="finishSetup()">
+          {{ finishButtonLabel }}
+        </button>
+        <button class="btn btn--ghost btn--wide" type="button" (click)="backFromRecovery()" [disabled]="busy">
+          Back
+        </button>
+      </div>
+    </div>
+  }
+</section>

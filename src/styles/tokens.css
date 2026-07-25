@@ -1,0 +1,79 @@
+/* System theme: light/dark from OS. data-theme mirrors it for components. */
+:root {
+  color-scheme: light dark;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --space: 8px;
+  --font: 'Figtree', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-display: 'Fraunces', 'Georgia', serif;
+  --mono: ui-monospace, 'SF Mono', monospace;
+  --sidebar-w: 72px;
+  --transition: 180ms ease;
+  --vault-metal: #8ba8c8;
+  --vault-brass: var(--vault-metal);
+}
+
+@media (prefers-color-scheme: light) {
+  :root,
+  [data-theme='light'] {
+    --bg: #f4f7fb;
+    --bg-elevated: #ffffff;
+    --bg-muted: #e8eef6;
+    --bg-hero: radial-gradient(100% 80% at 15% 0%, #d8e8f8 0%, transparent 50%),
+      radial-gradient(80% 60% at 100% 20%, #dce4f5 0%, transparent 45%),
+      linear-gradient(165deg, #f8fafc 0%, #eef2f8 100%);
+    --text: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --border: rgba(15, 23, 42, 0.1);
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-soft: rgba(37, 99, 235, 0.12);
+    --accent-2: #0ea5e9;
+    --danger: #dc2626;
+    --danger-soft: rgba(220, 38, 38, 0.1);
+    --warning: #d97706;
+    --chart-1: #2563eb;
+    --chart-2: #0ea5e9;
+    --chart-3: #6366f1;
+    --chart-4: #8b5cf6;
+    --chart-5: #f43f5e;
+    --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 14px 36px rgba(15, 23, 42, 0.08);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root,
+  [data-theme='dark'] {
+    --bg: #0b1220;
+    --bg-elevated: #111a2e;
+    --bg-muted: #1a2540;
+    --bg-hero: radial-gradient(100% 80% at 15% 0%, rgba(37, 99, 235, 0.22) 0%, transparent 50%),
+      radial-gradient(80% 60% at 100% 20%, rgba(14, 165, 233, 0.16) 0%, transparent 45%),
+      linear-gradient(165deg, #0d1528 0%, #080e18 100%);
+    --text: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --border: rgba(241, 245, 249, 0.1);
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --accent-soft: rgba(96, 165, 250, 0.14);
+    --accent-2: #38bdf8;
+    --danger: #f87171;
+    --danger-soft: rgba(248, 113, 113, 0.12);
+    --warning: #fbbf24;
+    --chart-1: #60a5fa;
+    --chart-2: #38bdf8;
+    --chart-3: #818cf8;
+    --chart-4: #a78bfa;
+    --chart-5: #fb7185;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 18px 44px rgba(0, 0, 0, 0.45);
+  }
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+}
+[data-theme='dark'] {
+  color-scheme: dark;
+}

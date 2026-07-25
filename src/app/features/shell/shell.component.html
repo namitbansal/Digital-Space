@@ -1,0 +1,756 @@
+<div class="app-shell">
+  <main class="main">
+    <header
+      class="topbar"
+      [class.topbar--dash]="view === 'dash' && !showSearch"
+      [class.topbar--search]="showSearch"
+    >
+      <div class="topbar__lead">
+        @if (view !== 'dash') {
+          <button class="btn btn--ghost" type="button" (click)="back()">
+            <app-icon icon="arrow-left"></app-icon>
+            <span>Back</span>
+          </button>
+        }
+        @if (showSearch) {
+          <div class="search-wrap">
+            <span class="search-wrap__icon" aria-hidden="true"><app-icon icon="search"></app-icon></span>
+            <input
+              type="search"
+              placeholder="Type at least 2 characters…"
+              [(ngModel)]="query"
+              (ngModelChange)="onSearchQueryChange()"
+              (keydown)="onSearchKeydown($event)"
+              aria-label="Search items"
+              aria-autocomplete="list"
+              [attr.aria-expanded]="searchQueryReady"
+              aria-controls="search-suggestions"
+              autofocus
+            />
+            @if (searchQueryReady) {
+              <ul id="search-suggestions" class="search-suggestions" role="listbox" aria-label="Search suggestions">
+                @for (item of searchSuggestions; track item.id) {
+                  <li role="presentation">
+                    <button type="button" class="search-suggestion" role="option" (click)="openSearchResult(item.id)">
+                      <span class="search-suggestion__icon" aria-hidden="true">
+                        <app-icon [name]="typeIcon(item.type)"></app-icon>
+                      </span>
+                      <span class="search-suggestion__body">
+                        <span class="search-suggestion__title">{{ item.title }}</span>
+                        <span class="search-suggestion__meta">
+                          <span class="search-suggestion__profile">{{ getProfileName(item.profileId) }}</span>
+                          <span class="search-suggestion__category">{{ itemCategoryNameFor(item) }}</span>
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                } @empty {
+                  <li class="search-suggestions__empty" role="presentation">No items match “{{ query.trim() }}”</li>
+                }
+              </ul>
+            }
+          </div>
+        } @else if (pageTitle) {
+          <h1 class="topbar__title">{{ pageTitle }}</h1>
+        }
+      </div>
+
+      <div class="topbar__actions">
+        @if (view === 'dash' && !showSearch) {
+          <div class="topbar-profile">
+            <span class="topbar-profile__label">Profile</span>
+            <div class="profile-picker" [class.is-open]="profileMenuOpen" (click)="$event.stopPropagation()">
+              <button
+                type="button"
+                class="profile-picker__trigger"
+                (click)="toggleProfileMenu($event)"
+                [attr.aria-expanded]="profileMenuOpen"
+                aria-haspopup="listbox"
+                aria-label="Switch profile"
+              >
+                <span class="profile-picker__value">{{ activeProfile?.name || 'Profile' }}</span>
+                <span class="profile-picker__chevron" aria-hidden="true"></span>
+              </button>
+              @if (profileMenuOpen) {
+                <ul class="profile-picker__menu" role="listbox" aria-label="Profiles">
+                  @for (p of profiles; track p.id) {
+                    <li role="presentation">
+                      <button
+                        type="button"
+                        class="profile-picker__option"
+                        role="option"
+                        [class.is-active]="p.id === activeProfileId"
+                        [attr.aria-selected]="p.id === activeProfileId"
+                        (click)="pickProfile(p.id)"
+                      >
+                        <span class="profile-picker__option-name">{{ p.name }}</span>
+                        @if (p.id === activeProfileId) {
+                          <app-icon icon="check"></app-icon>
+                        }
+                      </button>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+            <button class="btn btn--ghost topbar-profile__family-btn" type="button" (click)="openProfileModal()" title="Add or manage family profiles">
+              <app-icon icon="users"></app-icon>
+              <span class="topbar__btn-label">Family</span>
+            </button>
+          </div>
+        }
+        <button class="btn btn--ghost topbar__action-btn" type="button" [class.is-active]="showSearch" (click)="toggleSearch()">
+          <app-icon [icon]="showSearch ? 'x' : 'search'"></app-icon>
+          <span class="topbar__btn-label">{{ showSearch ? 'Close' : 'Search' }}</span>
+        </button>
+        <button class="btn btn--primary topbar__action-btn" type="button" (click)="openNew()">
+          <app-icon icon="plus"></app-icon>
+          <span class="topbar__btn-label">Add item</span>
+        </button>
+      </div>
+      <div class="topbar__vault-actions">
+          <button
+            class="btn btn--ghost btn--icon topbar__history-btn"
+            type="button"
+            (click)="openHistoryModal()"
+            title="Activity history"
+            aria-label="Activity history"
+          >
+            <img class="topbar__action-icon" src="icons/activity-history.svg" width="20" height="20" alt="" />
+          </button>
+          <button
+            class="btn btn--ghost btn--icon topbar__account-btn"
+            type="button"
+            (click)="openSettingsModal()"
+            title="Account settings"
+            aria-label="Account settings"
+          >
+            <img class="topbar__action-icon" src="icons/account-settings.svg" width="20" height="20" alt="" />
+          </button>
+          <button
+            class="btn btn--ghost btn--icon topbar__lock-btn"
+            type="button"
+            (click)="lock()"
+            title="Lock vault"
+            aria-label="Lock vault"
+          >
+            <img class="topbar__action-icon topbar__action-icon--logout" src="icons/logout.svg" width="20" height="20" alt="" />
+          </button>
+      </div>
+    </header>
+
+    @if (shellGuidanceId) {
+      <app-guidance-panel [guidanceId]="shellGuidanceId" />
+    }
+
+    <div class="stage" [attr.data-view]="view">
+      @if (view === 'dash') {
+        <section class="dashboard dashboard-home">
+          <div class="dashboard-home__head">
+            <div>
+              <h2 class="dashboard-home__title">{{ profileVaultTitle() }}</h2>
+              <p class="dashboard-home__sub">Your items, categories, and documents for this profile.</p>
+            </div>
+          </div>
+
+          <div class="dash-grid">
+            <div class="dash-tile">
+              <h3>Items</h3>
+              <strong>{{ totalCount }}</strong>
+            </div>
+            <div class="dash-tile">
+              <h3>Categories</h3>
+              <strong>{{ categoryCount }}</strong>
+            </div>
+            <div class="dash-tile">
+              <h3>Documents</h3>
+              <strong>{{ documentCount }}</strong>
+            </div>
+          </div>
+
+          <div class="dashboard-section">
+            <div class="dashboard-section__head">
+              <h3 class="dashboard-section__title">
+                <app-icon icon="grid"></app-icon>
+                Category
+              </h3>
+            </div>
+            <div class="dash-grid dash-grid--categories">
+              @for (c of categoryBars; track c.id; let i = $index) {
+                <article class="category-card">
+                  <button type="button" class="category-card__main" (click)="openCategory(c.id)">
+                    <span class="category-card__icon" [attr.data-tone]="i % 5">
+                      <app-icon [name]="c.icon"></app-icon>
+                    </span>
+                    <span class="category-card__text">
+                      <span class="category-card__name">{{ c.label }}</span>
+                      <span class="category-card__meta">
+                        {{ c.count }} {{ c.count === 1 ? 'item' : 'items' }}
+                      </span>
+                    </span>
+                    <span class="category-card__arrow" aria-hidden="true">
+                      <app-icon icon="arrow-left"></app-icon>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="category-card__remove category-card__remove--locked"
+                    (click)="onBuiltInCategoryRemove(c.label, $event)"
+                    [attr.aria-label]="'Remove ' + c.label"
+                    title="Built-in category — cannot be removed"
+                  >
+                    <app-icon icon="trash"></app-icon>
+                  </button>
+                </article>
+              }
+              @for (f of customFolderBars; track f.id; let i = $index) {
+                <article class="category-card">
+                  <button type="button" class="category-card__main" (click)="openCustomFolder(f.id)">
+                    <span class="category-card__icon" [attr.data-tone]="(i + categoryBars.length) % 5">
+                      <app-icon icon="folder"></app-icon>
+                    </span>
+                    <span class="category-card__text">
+                      <span class="category-card__name">{{ f.name }}</span>
+                      <span class="category-card__meta">
+                        {{ f.count }} {{ f.count === 1 ? 'item' : 'items' }}
+                      </span>
+                    </span>
+                    <span class="category-card__arrow" aria-hidden="true">
+                      <app-icon icon="arrow-left"></app-icon>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="category-card__remove"
+                    (click)="deleteCustomCategory(f.id, $event)"
+                    [attr.aria-label]="'Remove ' + f.name"
+                    title="Remove category"
+                  >
+                    <app-icon icon="trash"></app-icon>
+                  </button>
+                </article>
+              }
+              <article class="category-card category-card--none">
+                <button type="button" class="category-card__main" (click)="openNoneCategory()">
+                  <span class="category-card__icon" [attr.data-tone]="categoryBars.length % 5">
+                    <app-icon icon="sparkles"></app-icon>
+                  </span>
+                  <span class="category-card__text">
+                    <span class="category-card__name">None</span>
+                    <span class="category-card__meta">
+                      {{ noneCategoryCount }} {{ noneCategoryCount === 1 ? 'item' : 'items' }}
+                    </span>
+                  </span>
+                  <span class="category-card__arrow" aria-hidden="true">
+                    <app-icon icon="arrow-left"></app-icon>
+                  </span>
+                </button>
+              </article>
+              <button type="button" class="category-card category-card--add" (click)="openAddCategoryModal()">
+                <span class="category-card__add-icon">
+                  <app-icon icon="plus"></app-icon>
+                </span>
+                <span class="category-card__add-text">
+                  <strong>Add new category</strong>
+                  <span>Create your own — e.g. Insurance, Work</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </section>
+      } @else {
+        <section class="list-pane">
+          @for (item of items; track item.id) {
+            <button class="list-item" type="button" [class.is-active]="selectedId === item.id" (click)="selectItem(item.id)">
+              <span class="list-item__icon" aria-hidden="true">
+                <app-icon [name]="typeIcon(item.type)"></app-icon>
+              </span>
+              <span class="list-item__body">
+                <span class="list-item__type">{{ itemCategoryName(item) }}</span>
+                <span class="list-item__title">{{ item.title }}</span>
+              </span>
+            </button>
+          } @empty {
+            <div class="empty-state">
+              <p>No items yet</p>
+              <button class="btn btn--primary" type="button" (click)="openNew()">
+                <app-icon icon="plus"></app-icon>
+                <span>Add item</span>
+              </button>
+            </div>
+          }
+        </section>
+
+        <section class="detail-pane shell-detail-pane">
+          @if (view === 'list') {
+            <div class="empty-state empty-state--hint">
+              <p>Select an item from the list, or tap <strong>Add item</strong>.</p>
+            </div>
+          } @else if (view === 'detail' && selected) {
+            <div class="detail-head">
+              <p class="detail-head__type">
+                <app-icon [name]="typeIcon(selected.type)"></app-icon>
+                {{ typeLabel(selected.type) }}
+              </p>
+              <h2>{{ selected.title }}</h2>
+              <div class="detail-head__actions">
+                <button class="btn btn--primary" type="button" (click)="openEdit()">
+                  <app-icon icon="pencil"></app-icon>
+                  <span>Edit</span>
+                </button>
+                <button class="btn btn--danger" type="button" (click)="deleteSelected()">
+                  <app-icon icon="trash"></app-icon>
+                  <span>Delete</span>
+                </button>
+              </div>
+            </div>
+            @for (f of fieldEntries(selected); track f.label) {
+              <div class="field">
+                <label>{{ f.label }}</label>
+                <input [type]="f.secret ? 'password' : 'text'" [value]="f.value" readonly />
+              </div>
+            }
+            @for (c of selected.customFields; track $index) {
+              @if (c.label || c.value) {
+                <div class="field">
+                  <label>{{ c.label || 'Custom field' }}</label>
+                  <input [type]="c.secret ? 'password' : 'text'" [value]="c.value" readonly />
+                </div>
+              }
+            }
+            @if (selected.attachments.length) {
+              <div class="attachments-block">
+                <h3>
+                  <app-icon icon="file"></app-icon>
+                  Documents
+                </h3>
+                @for (a of selected.attachments; track a.id) {
+                  <div class="attachment-row">
+                    <app-icon icon="file"></app-icon>
+                    <span>{{ a.fileName }}</span>
+                    <span class="attachment-row__size">{{ formatBytes(a.size) }}</span>
+                  </div>
+                }
+              </div>
+            }
+          }
+        </section>
+      }
+    </div>
+  </main>
+</div>
+
+@if (showEditor) {
+  <div class="modal-backdrop" (click)="closeEditor()">
+    <div class="modal modal--editor" (click)="$event.stopPropagation()" role="dialog">
+      <header class="modal__head">
+        <h2>
+          <app-icon [name]="editingItemId ? 'pencil' : 'plus'"></app-icon>
+          {{ editingItemId ? 'Edit item' : 'New item' }}
+        </h2>
+        <div class="modal__head-actions">
+          <span class="editor-profile-chip">
+            <app-icon icon="user"></app-icon>
+            <span>{{ activeProfile?.name || 'Me' }}</span>
+          </span>
+          <button type="button" class="btn btn--ghost" (click)="closeEditor()">
+            <app-icon icon="x"></app-icon>
+            <span>Cancel</span>
+          </button>
+        </div>
+      </header>
+
+      <app-guidance-panel guidanceId="shell-editor" />
+
+      @if (editingItemId) {
+        <p class="editor-hint editor-hint--edit">Update saved details below. Changes overwrite what is stored in your vault.</p>
+        <div class="editor-type-block">
+          <p class="editor-field-label">Category</p>
+          @if (draftFolderId) {
+            <div class="type-list type-list--readonly">
+              <span class="type-option is-active" aria-current="true">
+                <app-icon icon="folder"></app-icon>
+                <span>{{ activeFolderNameForDraft() }}</span>
+              </span>
+            </div>
+          } @else {
+            <div class="type-list type-list--readonly">
+              <span class="type-option is-active" aria-current="true">
+                <app-icon [name]="typeIcon(draftType)"></app-icon>
+                <span>{{ typeLabel(draftType) }}</span>
+              </span>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="editor-type-block">
+          <p class="editor-field-label">Category</p>
+          <p class="field-hint editor-field-hint">Default categories — or pick / add your own below.</p>
+          <div class="type-list">
+            @for (t of defaultCategories; track t.id) {
+              <button
+                type="button"
+                class="type-option"
+                [class.is-active]="isDefaultCategoryActive(t.id)"
+                (click)="selectDefaultCategory(t.id)"
+              >
+                <app-icon [name]="t.icon"></app-icon>
+                <span>{{ t.label }}</span>
+              </button>
+            }
+          </div>
+          @if (customFolders.length) {
+            <p class="editor-field-label editor-field-label--sub">Your categories</p>
+            <div class="type-list">
+              @for (f of customFolders; track f.id) {
+                <button
+                  type="button"
+                  class="type-option"
+                  [class.is-active]="isCustomCategoryActive(f.id)"
+                  (click)="selectCustomCategory(f.id)"
+                >
+                  <app-icon icon="folder"></app-icon>
+                  <span>{{ f.name }}</span>
+                </button>
+              }
+            </div>
+          }
+          <button type="button" class="editor-add-category" (click)="openAddCategoryModal()">
+            <app-icon icon="plus"></app-icon>
+            <span>Add new category</span>
+          </button>
+        </div>
+      }
+
+      @if (draftFolderId) {
+        <div class="editor-type-block">
+          <p class="editor-field-label">Item type</p>
+          <p class="field-hint editor-field-hint">Fields for this item — includes Custom for anything else.</p>
+          <div class="type-list">
+            @for (t of types; track t.id) {
+              <button type="button" class="type-option" [class.is-active]="draftType === t.id" (click)="draftType = t.id; onTypeChange()">
+                <app-icon [name]="t.icon"></app-icon>
+                <span>{{ t.label }}</span>
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="field">
+        <label>Title</label>
+        <input [(ngModel)]="draftTitle" name="draftTitle" placeholder="e.g. Gmail, Netflix, SBI" />
+      </div>
+
+      <div class="editor-section">
+        @for (f of draftFieldDefs(); track f.name) {
+          <div class="field">
+            <label>{{ f.label }}</label>
+            @if (f.type === 'textarea') {
+              <textarea [(ngModel)]="draftFields[f.name]" [name]="'f-' + f.name" rows="3"></textarea>
+            } @else if (f.type === 'select' && f.options) {
+              <select [(ngModel)]="draftFields[f.name]" [name]="'f-' + f.name">
+                @for (o of f.options; track o.value) {
+                  <option [value]="o.value">{{ o.label }}</option>
+                }
+              </select>
+            } @else {
+              <input
+                [type]="f.type === 'password' ? 'password' : f.type === 'date' ? 'date' : f.type === 'email' ? 'email' : f.type === 'url' ? 'url' : 'text'"
+                [(ngModel)]="draftFields[f.name]"
+                [name]="'f-' + f.name"
+              />
+            }
+          </div>
+        }
+      </div>
+
+      <div class="editor-section editor-section--custom">
+        <div class="editor-section__head">
+          <div class="editor-section__title">
+            <span class="editor-section__icon" aria-hidden="true">
+              <app-icon icon="sparkles"></app-icon>
+            </span>
+            <div>
+              <h3>Extra fields</h3>
+              <p class="editor-section__desc">Policy no., locker number, PIN, and more</p>
+            </div>
+          </div>
+          <button type="button" class="btn btn--primary btn--sm" (click)="addCustomField()">
+            <app-icon icon="plus"></app-icon>
+            <span>Add field</span>
+          </button>
+        </div>
+
+        @if (!draftCustom.length) {
+          <button type="button" class="extra-fields-empty" (click)="addCustomField()">
+            <span class="extra-fields-empty__icon">
+              <app-icon icon="plus"></app-icon>
+            </span>
+            <strong>Add your first extra field</strong>
+            <span>Tap here for custom labels and values</span>
+          </button>
+        } @else {
+          <div class="extra-fields-list">
+            @for (c of draftCustom; track $index; let i = $index) {
+              <article class="extra-field-card">
+                <header class="extra-field-card__head">
+                  <span class="extra-field-card__badge">{{ i + 1 }}</span>
+                  <span class="extra-field-card__label">{{ c.label || 'New field' }}</span>
+                  <button type="button" class="extra-field-card__remove" (click)="removeCustomField(i)" aria-label="Remove field">
+                    <app-icon icon="trash"></app-icon>
+                  </button>
+                </header>
+                <div class="extra-field-card__body">
+                  <div class="field">
+                    <label>Label</label>
+                    <input [(ngModel)]="c.label" [name]="'cl-' + i" placeholder="e.g. Policy number" />
+                  </div>
+                  <div class="field">
+                    <label>Value</label>
+                    <input [(ngModel)]="c.value" [name]="'cv-' + i" [type]="c.secret ? 'password' : 'text'" placeholder="Enter value" />
+                  </div>
+                </div>
+                <label class="secret-pill" [class.is-on]="c.secret">
+                  <input type="checkbox" [(ngModel)]="c.secret" [name]="'cs-' + i" />
+                  <app-icon [name]="c.secret ? 'lock' : 'eye'"></app-icon>
+                  <span>{{ c.secret ? 'Secret — hidden value' : 'Mark as secret' }}</span>
+                </label>
+              </article>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="editor-section editor-section--docs">
+        <div class="editor-section__head">
+          <div class="editor-section__title">
+            <span class="editor-section__icon editor-section__icon--docs" aria-hidden="true">
+              <app-icon icon="file"></app-icon>
+            </span>
+            <div>
+              <h3>Documents</h3>
+              <p class="editor-section__desc">PDFs, photos, scans, and receipts</p>
+            </div>
+          </div>
+          <button type="button" class="btn btn--primary btn--sm" (click)="pickDocument()">
+            <app-icon icon="plus"></app-icon>
+            <span>Add document</span>
+          </button>
+        </div>
+        <input #docInput type="file" class="sr-only" multiple accept="*/*" (change)="onDocumentsSelected($event)" />
+        @if (!draftAttachments.length) {
+          <button type="button" class="docs-dropzone" (click)="pickDocument()">
+            <span class="docs-dropzone__icon">
+              <app-icon icon="file"></app-icon>
+            </span>
+            <strong>Drop or tap to attach a document</strong>
+            <span>PDF, JPG, PNG, and other files</span>
+          </button>
+        } @else {
+          <div class="docs-list">
+            @for (a of draftAttachments; track a.id) {
+              <div class="doc-card">
+                <span class="doc-card__icon">
+                  <app-icon icon="file"></app-icon>
+                </span>
+                <div class="doc-card__meta">
+                  <strong>{{ a.fileName }}</strong>
+                  <span>{{ formatBytes(a.size) }}</span>
+                </div>
+                <button type="button" class="extra-field-card__remove" (click)="removeDraftAttachment(a.id)" aria-label="Remove document">
+                  <app-icon icon="trash"></app-icon>
+                </button>
+              </div>
+            }
+            <button type="button" class="docs-add-more" (click)="pickDocument()">
+              <app-icon icon="plus"></app-icon>
+              <span>Add another document</span>
+            </button>
+          </div>
+        }
+      </div>
+
+      @if (editorError) {
+        <p class="auth-error">{{ editorError }}</p>
+      }
+
+      <div class="modal__actions">
+        <button type="button" class="btn btn--primary" (click)="saveItem()">
+          <app-icon icon="check"></app-icon>
+          <span>{{ editingItemId ? 'Save changes' : 'Save item' }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showProfileModal) {
+  <div class="modal-backdrop modal-backdrop--stack" (click)="closeProfileModal()">
+    <div class="modal modal--profile" (click)="$event.stopPropagation()" role="dialog">
+      <header class="modal__head">
+        <h2>
+          <app-icon icon="users"></app-icon>
+          Family profiles
+        </h2>
+        <button type="button" class="btn btn--ghost" (click)="closeProfileModal()">
+          <app-icon icon="x"></app-icon>
+          <span>Close</span>
+        </button>
+      </header>
+
+      <p class="editor-hint">Each family member has their own folders and items. Switch profile from the Home page.</p>
+
+      <div class="profile-list">
+        @for (p of profiles; track p.id) {
+          <div class="profile-card" [class.is-active]="p.id === activeProfileId">
+            <div class="profile-card__info">
+              <app-icon icon="user"></app-icon>
+              <div>
+                <strong>{{ p.name }}</strong>
+                <span>{{ relationshipLabel(p.relationship) }}</span>
+              </div>
+              @if (p.id === activeProfileId) {
+                <span class="profile-badge">Active</span>
+              }
+            </div>
+            <div class="profile-card__actions">
+              @if (p.id !== activeProfileId) {
+                <button type="button" class="btn btn--ghost btn--sm" (click)="switchProfileInModal(p.id)">
+                  <span>Switch</span>
+                </button>
+              }
+              <button type="button" class="btn btn--ghost btn--sm" (click)="startEditProfile(p)">
+                <span>Edit</span>
+              </button>
+              @if (profiles.length > 1 && p.relationship !== 'self') {
+                <button type="button" class="btn btn--danger btn--sm" (click)="deleteProfile(p.id)">
+                  <app-icon icon="trash"></app-icon>
+                  <span>Delete</span>
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="editor-section editor-section--profile">
+        <h3>
+          @if (profileEditingId) {
+            Edit profile
+          } @else {
+            Add family member
+          }
+        </h3>
+        <div class="field">
+          <label for="profile-name">Name</label>
+          <input id="profile-name" [(ngModel)]="profileName" name="profileName" placeholder="e.g. Riya, Dad, Mom" />
+        </div>
+        <div class="field">
+          <label for="profile-rel">Relationship</label>
+          <select id="profile-rel" [(ngModel)]="profileRelationship" name="profileRelationship">
+            @if (profileEditingId && activeProfile?.id === profileEditingId && activeProfile?.relationship === 'self') {
+              <option value="self">Me</option>
+            }
+            @for (r of profileEditingId ? profileRelationships : profileRelationshipsForAdd; track r.value) {
+              <option [value]="r.value">{{ r.label }}</option>
+            }
+          </select>
+        </div>
+
+        @if (profileError) {
+          <p class="auth-error">{{ profileError }}</p>
+        }
+
+        <div class="modal__actions modal__actions--inline">
+          @if (profileEditingId) {
+            <button type="button" class="btn btn--ghost" (click)="startAddFamilyMember()">
+              <app-icon icon="plus"></app-icon>
+              <span>Add another</span>
+            </button>
+          }
+          <button type="button" class="btn btn--primary" (click)="saveProfile()">
+            <app-icon [name]="profileEditingId ? 'check' : 'plus'"></app-icon>
+            <span>{{ profileEditingId ? 'Save changes' : 'Add member' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showCategoryModal) {
+  <div class="modal-backdrop modal-backdrop--stack" (click)="closeCategoryModal()">
+    <div class="modal modal--category" (click)="$event.stopPropagation()" role="dialog">
+      <header class="modal__head">
+        <h2>
+          <app-icon icon="plus"></app-icon>
+          Add new category
+        </h2>
+        <button type="button" class="btn btn--ghost" (click)="closeCategoryModal()">
+          <app-icon icon="x"></app-icon>
+          <span>Cancel</span>
+        </button>
+      </header>
+      <p class="editor-hint">Your own category — e.g. Insurance, Work, Travel.</p>
+      <div class="field">
+        <label for="category-name">Category name</label>
+        <input
+          id="category-name"
+          [(ngModel)]="categoryName"
+          name="categoryName"
+          placeholder="e.g. Insurance"
+          autofocus
+          (keyup.enter)="saveCategory()"
+        />
+      </div>
+      @if (categoryError) {
+        <p class="auth-error">{{ categoryError }}</p>
+      }
+      <div class="modal__actions">
+        <button type="button" class="btn btn--primary" (click)="saveCategory()">
+          <app-icon icon="check"></app-icon>
+          <span>Create category</span>
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<app-account-settings
+  [open]="showSettingsModal"
+  [focusSection]="settingsFocusSection"
+  (closed)="closeSettingsModal()"
+  (updated)="refresh()"
+/>
+
+<app-activity-history [open]="showHistoryModal" (closed)="closeHistoryModal()" />
+
+@if (showConfirmModal) {
+  <div class="modal-backdrop modal-backdrop--stack" (click)="closeConfirm()">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()" role="alertdialog" aria-modal="true">
+      <header class="modal__head">
+        <h2>
+          <app-icon [name]="confirmDanger ? 'trash' : 'shield'"></app-icon>
+          {{ confirmTitle }}
+        </h2>
+        @if (!confirmInfoOnly) {
+          <span class="confirm-step">Step {{ confirmStep }} of 2</span>
+        }
+      </header>
+      <p class="confirm-message">{{ confirmBody }}</p>
+      <div class="modal__actions modal__actions--inline">
+        <button type="button" class="btn btn--ghost" (click)="closeConfirm()">Cancel</button>
+        <button
+          type="button"
+          class="btn"
+          [class.btn--danger]="confirmDanger && (confirmInfoOnly || confirmStep === 2)"
+          [class.btn--primary]="!confirmDanger || confirmStep === 1"
+          (click)="confirmNext()"
+        >
+          {{ confirmPrimaryLabel }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

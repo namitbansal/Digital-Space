@@ -1,0 +1,140 @@
+.modal--settings {
+  max-width: 520px;
+  max-height: min(92dvh, 860px);
+  overflow: auto;
+}
+
+.modal--settings .modal__head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-bottom: 10px;
+  background: var(--bg-elevated);
+}
+
+.settings-section {
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+
+.settings-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.settings-section h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.settings-recovery-list {
+  margin: 8px 0 12px;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.settings-recovery-missing {
+  margin: 8px 0;
+}
+
+.recovery-code-box {
+  margin: 10px 0;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  background: var(--bg-muted);
+  text-align: center;
+}
+
+.recovery-code-box__code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.settings-success {
+  margin: 8px 0 0;
+  color: var(--accent);
+  font-size: 0.88rem;
+}
+
+.settings-google-connected {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-muted);
+}
+
+.settings-google-connected strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.settings-google-connected span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.settings-google-empty {
+  margin: 12px 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.settings-sync-status {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.settings-sync-status[data-status='offline'] {
+  border-color: rgba(234, 179, 8, 0.35);
+}
+
+.settings-sync-status[data-status='ok'] {
+  border-color: rgba(37, 99, 235, 0.35);
+  color: var(--accent);
+}
+
+.settings-sync-status[data-status='error'],
+.settings-sync-status[data-status='conflict'] {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.settings-about {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.settings-about__name {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-about__version {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.settings-about__tips {
+  margin-top: 10px;
+}

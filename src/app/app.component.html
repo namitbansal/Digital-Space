@@ -1,0 +1,17 @@
+@switch (screen) {
+  @case ('welcome') {
+    <app-welcome [hasVault]="hasVault" (create)="goCreate()" (unlock)="goUnlock()" />
+  }
+  @case ('create') {
+    <app-create-vault (created)="onReady()" (back)="goWelcome()" />
+  }
+  @case ('unlock') {
+    <app-unlock (unlocked)="onReady()" (forgot)="goForgot()" (back)="goWelcome()" />
+  }
+  @case ('forgot') {
+    <app-forgot-password (reset)="onReady()" (back)="goUnlock()" />
+  }
+  @case ('app') {
+    <app-shell (locked)="onLocked()" />
+  }
+}

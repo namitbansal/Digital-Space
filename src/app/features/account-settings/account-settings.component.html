@@ -1,0 +1,305 @@
+@if (open) {
+  <div class="modal-backdrop modal-backdrop--stack" (click)="close()">
+    <div class="modal modal--settings" (click)="$event.stopPropagation()" role="dialog">
+      <header class="modal__head">
+        <h2>
+          <app-icon icon="settings"></app-icon>
+          Account settings
+        </h2>
+        <button type="button" class="btn btn--ghost btn--icon modal__close" (click)="close()" aria-label="Close">
+          <app-icon icon="x"></app-icon>
+        </button>
+      </header>
+
+      <app-guidance-panel guidanceId="account-settings" />
+
+      <div class="settings-section">
+        <h3>Your name</h3>
+        <p class="editor-hint">Shown on your profile and home dashboard.</p>
+        <div class="field">
+          <label for="settings-owner-name">Name</label>
+          <input id="settings-owner-name" [(ngModel)]="ownerName" name="ownerName" placeholder="Name" autocomplete="name" />
+        </div>
+        @if (ownerError) {
+          <p class="auth-error">{{ ownerError }}</p>
+        }
+        @if (ownerSuccess) {
+          <p class="settings-success">{{ ownerSuccess }}</p>
+        }
+        <div class="modal__actions modal__actions--inline">
+          <button type="button" class="btn btn--primary" [disabled]="ownerBusy" (click)="saveOwnerName()">
+            <app-icon icon="check"></app-icon>
+            <span>Save name</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-section" id="settings-recovery">
+        <h3>Password recovery</h3>
+        <p class="editor-hint">
+          Two ways to recover if you forget your master password:
+          <strong>Google Drive</strong> (your primary Google account — or the Drive backup account if you use a separate one) or your
+          <strong>recovery code</strong> (shown once when you created the vault).
+        </p>
+        <ul class="settings-recovery-list">
+          <li>Google recovery — uses your <strong>primary Google account</strong> to unlock the recovery file on Drive.</li>
+          <li>Recovery code — saved on this device; also copied to Drive when syncing.</li>
+        </ul>
+        @if (codeRecoveryReady) {
+          <p class="settings-success">Recovery code backup is active on this device.</p>
+        } @else {
+          <p class="auth-error settings-recovery-missing">No recovery code found on this device.</p>
+        }
+        @if (recoveryCodeError) {
+          <p class="auth-error">{{ recoveryCodeError }}</p>
+        }
+        @if (recoveryCodeSuccess) {
+          <p class="settings-success">{{ recoveryCodeSuccess }}</p>
+        }
+        @if (newRecoveryCode) {
+          <div class="recovery-code-box">
+            <code class="recovery-code-box__code">{{ newRecoveryCode }}</code>
+          </div>
+          <p class="field-hint">Save this new code — the old one no longer works.</p>
+        }
+        <div class="field">
+          <label for="regen-current-password">Current master password</label>
+          <input
+            id="regen-current-password"
+            type="password"
+            [(ngModel)]="regenPassword"
+            name="regenPassword"
+            autocomplete="current-password"
+          />
+        </div>
+        <div class="modal__actions modal__actions--inline">
+          <button type="button" class="btn btn--ghost" [disabled]="recoveryCodeBusy" (click)="regenerateRecoveryCode()">
+            Generate new recovery code
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-section" id="settings-master-password">
+        <h3>Master password</h3>
+        <p class="editor-hint">Change the password used to unlock your vault. If you forget it, use <strong>Forgot master password</strong> on the unlock screen (Google Drive or recovery code).</p>
+        <div class="field">
+          <label for="settings-current-password">Current password</label>
+          <input
+            id="settings-current-password"
+            type="password"
+            [(ngModel)]="currentPassword"
+            name="currentPassword"
+            autocomplete="current-password"
+          />
+        </div>
+        <div class="field">
+          <label for="settings-new-password">New password</label>
+          <input
+            id="settings-new-password"
+            type="password"
+            [(ngModel)]="newPassword"
+            name="newPassword"
+            autocomplete="new-password"
+            minlength="8"
+          />
+          <p class="field-hint">At least 8 characters.</p>
+        </div>
+        <div class="field">
+          <label for="settings-confirm-password">Confirm new password</label>
+          <input
+            id="settings-confirm-password"
+            type="password"
+            [(ngModel)]="confirmPassword"
+            name="confirmPassword"
+            autocomplete="new-password"
+            minlength="8"
+          />
+        </div>
+        @if (passwordError) {
+          <p class="auth-error">{{ passwordError }}</p>
+        }
+        @if (passwordSuccess) {
+          <p class="settings-success">{{ passwordSuccess }}</p>
+        }
+        <div class="modal__actions modal__actions--inline">
+          <button type="button" class="btn btn--primary" [disabled]="passwordBusy" (click)="saveMasterPassword()">
+            <app-icon icon="lock"></app-icon>
+            <span>Update password</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Storage &amp; backup</h3>
+        <p class="editor-hint">
+          Your vault always works offline on this phone. Choose whether to also back up encrypted data to Google Drive.
+          Everything on Drive is <strong>AES-256 encrypted</strong> — Google cannot read your passwords or files without your master password.
+          A <strong>recovery file</strong> is saved on Drive so you can reset your master password with the same Google account if you forget it.
+        </p>
+        <div class="field">
+          <label for="storage-mode">Where to save</label>
+          <select id="storage-mode" [(ngModel)]="storageMode" name="storageMode" (ngModelChange)="saveStorageMode()">
+            <option value="device">This device only (offline)</option>
+            <option value="hybrid">This device + Google Drive (recommended)</option>
+          </select>
+          <p class="field-hint">Hybrid: edit offline on your phone; syncs to Google when you're back online.</p>
+        </div>
+        <p class="settings-sync-status" [attr.data-status]="sync.syncState().status">
+          {{ sync.syncState().message }}
+        </p>
+        @if (syncError) {
+          <p class="auth-error">{{ syncError }}</p>
+        }
+        @if (syncSuccess) {
+          <p class="settings-success">{{ syncSuccess }}</p>
+        }
+        @if (storageMode !== 'device') {
+          <div class="modal__actions modal__actions--inline">
+            <button type="button" class="btn btn--ghost" [disabled]="syncBusy" (click)="syncNow()">
+              <span>Sync now</span>
+            </button>
+            <button type="button" class="btn btn--ghost" [disabled]="syncBusy" (click)="pullFromDrive()">
+              <span>Pull from Drive</span>
+            </button>
+          </div>
+        }
+      </div>
+
+      <div class="settings-section">
+        <h3>Google accounts</h3>
+        <p class="editor-hint">
+          Optional — connect Google for encrypted Drive backup and email PIN recovery.
+          You can use the same account for both, or pick a separate one for Drive.
+        </p>
+
+        <div class="setup-guide setup-guide--soft">
+          <strong>Primary account</strong>
+          <p>{{ hints.identity }}</p>
+          @if (googleIdentityEmail) {
+            <div class="settings-google-connected">
+              <app-icon icon="shield"></app-icon>
+              <div>
+                <strong>{{ googleIdentityEmail }}</strong>
+                <span>Primary · recovery</span>
+              </div>
+            </div>
+          } @else {
+            <p class="settings-google-empty">No primary Google account connected.</p>
+          }
+        </div>
+
+        <div class="setup-guide setup-guide--soft">
+          <strong>Drive backup account</strong>
+          @if (driveUsesSameAccount && googleIdentityEmail) {
+            <p class="field-hint">Same as primary: <strong>{{ googleIdentityEmail }}</strong></p>
+          } @else if (googleAccountEmail) {
+            <div class="settings-google-connected">
+              <app-icon icon="shield"></app-icon>
+              <div>
+                <strong>{{ googleAccountEmail }}</strong>
+                <span>Drive backup only</span>
+              </div>
+            </div>
+          } @else {
+            <p class="settings-google-empty">No Drive backup account connected.</p>
+          }
+          @if (storageMode !== 'device' && (googleAccountEmail || (driveUsesSameAccount && googleIdentityEmail))) {
+            @if (driveIsVerified) {
+              <p class="settings-success">{{ hints.driveVerifiedOk }}</p>
+              <p class="field-hint">Folder: <strong>{{ driveFolderPath }}</strong></p>
+            } @else {
+              <p class="auth-error">{{ hints.driveVerifyFailed }}</p>
+            }
+          }
+        </div>
+
+        @if (!googleBuiltIn) {
+          <details class="setup-guide">
+            <summary>Advanced: Google OAuth Client ID (app owners)</summary>
+            <ol class="setup-guide__list">
+              @for (step of clientIdSteps; track step) {
+                <li>{{ step }}</li>
+              }
+            </ol>
+          </details>
+
+          <div class="field">
+            <label for="settings-google-client-id">Google OAuth Client ID</label>
+            <input
+              id="settings-google-client-id"
+              [(ngModel)]="googleClientId"
+              name="googleClientId"
+              placeholder="your-client-id.apps.googleusercontent.com"
+              autocomplete="off"
+            />
+          </div>
+        }
+        @if (googleError) {
+          <p class="auth-error">{{ googleError }}</p>
+        }
+        @if (googleSuccess) {
+          <p class="settings-success">{{ googleSuccess }}</p>
+        }
+        <div class="modal__actions modal__actions--inline">
+          @if (googleIdentityEmail) {
+            <button type="button" class="btn btn--ghost" [disabled]="googleBusy" (click)="changeIdentityGoogleAccount()">
+              <span>Change primary</span>
+            </button>
+          } @else {
+            <button type="button" class="btn btn--primary" [disabled]="googleBusy" (click)="connectIdentityGoogle()">
+              <app-icon icon="shield"></app-icon>
+              <span>{{ googleBusy ? 'Connecting…' : 'Connect primary Google' }}</span>
+            </button>
+          }
+          @if (storageMode !== 'device') {
+            @if (!driveIsVerified && (googleAccountEmail || googleIdentityEmail)) {
+              <button type="button" class="btn btn--ghost" [disabled]="driveVerifyBusy || googleBusy" (click)="verifyDriveAccess()">
+                <span>{{ driveVerifyBusy ? 'Verifying…' : 'Verify Drive access' }}</span>
+              </button>
+            }
+            @if (googleAccountEmail && !driveUsesSameAccount) {
+              <button type="button" class="btn btn--ghost" [disabled]="googleBusy" (click)="changeGoogleAccount()">
+                <span>Change Drive account</span>
+              </button>
+            } @else if (googleIdentityEmail && driveUsesSameAccount) {
+              <button type="button" class="btn btn--ghost" [disabled]="googleBusy" (click)="connectDriveGoogle()">
+                <span>Use different Drive account</span>
+              </button>
+            }
+          }
+          @if (googleIdentityEmail) {
+            <button type="button" class="btn btn--danger" [disabled]="googleBusy" (click)="disconnectGoogleAccount()">
+              <span>Disconnect all</span>
+            </button>
+          }
+        </div>
+      </div>
+
+      <footer class="settings-about">
+        <p class="settings-about__name">{{ appName }}</p>
+        <p class="settings-about__version">{{ appVersionLabel }}</p>
+        <button type="button" class="btn btn--ghost settings-about__tips" (click)="resetGuidanceTips()">
+          Show tips again
+        </button>
+        @if (guidanceResetSuccess) {
+          <p class="settings-success">{{ guidanceResetSuccess }}</p>
+        }
+      </footer>
+    </div>
+  </div>
+}
+
+@if (showGoogleConfirm) {
+  <div class="modal-backdrop modal-backdrop--stack" (click)="closeGoogleConfirm()">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()" role="alertdialog">
+      <header class="modal__head">
+        <h2>{{ googleConfirmTitle }}</h2>
+      </header>
+      <p class="confirm-message">{{ googleConfirmMessage }}</p>
+      <div class="modal__actions modal__actions--inline">
+        <button type="button" class="btn btn--ghost" (click)="closeGoogleConfirm()">Cancel</button>
+        <button type="button" class="btn btn--primary" (click)="confirmGoogleAction()">Continue</button>
+      </div>
+    </div>
+  </div>
+}

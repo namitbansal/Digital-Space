@@ -1,0 +1,58 @@
+@if (open) {
+  <div class="modal-backdrop modal-backdrop--stack" (click)="close()">
+    <div class="modal modal--history" (click)="$event.stopPropagation()" role="dialog" aria-label="Activity history">
+      <header class="modal__head">
+        <h2>
+          <app-icon icon="clock"></app-icon>
+          Activity history
+        </h2>
+        <button type="button" class="btn btn--ghost btn--icon modal__close" (click)="close()" aria-label="Close">
+          <app-icon icon="x"></app-icon>
+        </button>
+      </header>
+
+      <p class="history-intro">
+        Everything you do in the app is recorded here with a timestamp — logins, items added or edited, files attached,
+        deletions, and sync.
+      </p>
+
+      <div class="history-filters">
+        <label for="history-filter">Show</label>
+        <select id="history-filter" [(ngModel)]="filter" name="historyFilter">
+          <option value="all">All activity</option>
+          <option value="session">Logins &amp; logouts</option>
+          <option value="item">Items</option>
+          <option value="file">Files</option>
+          <option value="profile">Profiles</option>
+          <option value="category">Categories</option>
+          <option value="sync">Sync</option>
+          <option value="vault">Vault &amp; security</option>
+        </select>
+      </div>
+
+      @if (filteredEntries.length === 0) {
+        <p class="history-empty">No activity recorded yet. Actions will appear here as you use the app.</p>
+      } @else {
+        <ol class="history-list">
+          @for (entry of filteredEntries; track entry.id) {
+            <li class="history-item">
+              <div class="history-item__head">
+                <div class="history-item__tags">
+                  <span class="history-item__badge">{{ category(entry.action) }}</span>
+                  @if (profileLabel(entry); as profile) {
+                    <span class="history-item__profile">{{ profile }}</span>
+                  }
+                </div>
+                <time class="history-item__time" [attr.datetime]="entry.at">{{ formatTime(entry.at) }}</time>
+              </div>
+              <p class="history-item__summary">{{ entry.summary }}</p>
+              @if (metaLine(entry); as detail) {
+                <p class="history-item__meta">{{ detail }}</p>
+              }
+            </li>
+          }
+        </ol>
+      }
+    </div>
+  </div>
+}

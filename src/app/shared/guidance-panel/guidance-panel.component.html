@@ -1,0 +1,18 @@
+@if (visible && content) {
+  <aside class="guidance-panel" role="note" aria-label="How to use this screen">
+    <div class="guidance-panel__head">
+      <span class="guidance-panel__badge">Tip</span>
+      <strong class="guidance-panel__title">{{ content.title }}</strong>
+      <button type="button" class="guidance-panel__close" (click)="dismiss()" aria-label="Dismiss tip">×</button>
+    </div>
+    <ul class="guidance-panel__list">
+      @for (tip of content.tips; track tip) {
+        <li>{{ tip }}</li>
+      }
+    </ul>
+    <div class="guidance-panel__actions">
+      <button type="button" class="btn btn--ghost btn--sm" (click)="skipAll()">Skip all tips</button>
+      <button type="button" class="btn btn--primary btn--sm" (click)="dismiss()">Got it</button>
+    </div>
+  </aside>
+}
