@@ -1,23 +1,27 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { ALL_GUIDANCE_IDS, GuidanceId } from '../constants/page-guidance';
-import { AppSettings } from '../models/vault.models';
-import { SettingsService } from '../storage/settings.service';
+
+const STORAGE_KEY = 'digital-space-guidance';
+
+interface GuidanceState {
+  guidanceDismissed?: Partial<Record<GuidanceId, boolean>>;
+  guidanceSkipAll?: boolean;
+}
 
 @Injectable({ providedIn: 'root' })
 export class GuidanceService {
-  private readonly settings = inject(SettingsService);
-  private cache: AppSettings | null = null;
+  private cache: GuidanceState | null = null;
 
   async shouldShow(id: GuidanceId): Promise<boolean> {
-    const current = await this.load();
+    const current = this.read();
     if (current.guidanceSkipAll) return false;
     return !current.guidanceDismissed?.[id];
   }
 
   async dismiss(id: GuidanceId): Promise<void> {
-    const current = await this.load();
+    const current = this.read();
     const guidanceDismissed = { ...(current.guidanceDismissed || {}), [id]: true };
-    this.cache = await this.settings.save({ guidanceDismissed });
+    this.write({ ...current, guidanceDismissed });
   }
 
   async skipAll(): Promise<void> {
@@ -25,17 +29,26 @@ export class GuidanceService {
       acc[key] = true;
       return acc;
     }, {});
-    this.cache = await this.settings.save({ guidanceSkipAll: true, guidanceDismissed: dismissed });
+    this.write({ guidanceSkipAll: true, guidanceDismissed: dismissed });
   }
 
   async resetAll(): Promise<void> {
-    this.cache = await this.settings.save({ guidanceSkipAll: false, guidanceDismissed: {} });
+    this.write({ guidanceSkipAll: false, guidanceDismissed: {} });
   }
 
-  private async load(): Promise<AppSettings> {
-    if (!this.cache) {
-      this.cache = await this.settings.load();
+  private read(): GuidanceState {
+    if (this.cache) return this.cache;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      this.cache = raw ? (JSON.parse(raw) as GuidanceState) : {};
+    } catch {
+      this.cache = {};
     }
     return this.cache;
+  }
+
+  private write(next: GuidanceState): void {
+    this.cache = next;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   }
 }

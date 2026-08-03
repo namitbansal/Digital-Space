@@ -2,6 +2,10 @@ import { Component, EventEmitter, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { googleErrorMessage } from '../../core/auth/google-errors';
 import { GoogleDriveLinkService } from '../../core/auth/google-drive-link.service';
+import {
+  clearPendingGoogleOAuth,
+  loadPendingGoogleOAuth,
+} from '../../core/auth/google-oauth-redirect.util';
 import { GoogleOAuthConfigService } from '../../core/auth/google-oauth-config.service';
 import { APP_NAME } from '../../core/constants/app-name';
 import { GOOGLE_ONBOARDING_HINTS } from '../../core/constants/google-setup-guide';
@@ -12,6 +16,7 @@ import { VaultService } from '../../core/services/vault.service';
 import { USERNAME_FORMAT_HINT, USERNAME_TAKEN_MESSAGE, usernameError } from '../../core/utils/username';
 import { describeDriveLayout } from '../../core/sync/drive-layout.util';
 import { GuidancePanelComponent } from '../../shared/guidance-panel/guidance-panel.component';
+import { LoggerService } from '../../core/services/logger.service';
 
 type StorageChoice = 'device' | 'google';
 type CreateStep = 'form' | 'storage' | 'google' | 'recovery';
@@ -28,14 +33,13 @@ export class CreateVaultComponent {
   readonly usernameFormatHint = USERNAME_FORMAT_HINT;
   readonly usernameTakenMessage = USERNAME_TAKEN_MESSAGE;
   googleConfigured = false;
-  googleAuthReady = false;
-  googleAuthPreparing = false;
 
   private readonly vault = inject(VaultService);
   private readonly registry = inject(UserRegistryApiService);
   private readonly googleLink = inject(GoogleDriveLinkService);
   private readonly oauthConfig = inject(GoogleOAuthConfigService);
   private readonly settings = inject(SettingsService);
+  private readonly log = inject(LoggerService);
 
   @Output() created = new EventEmitter<void>();
   @Output() back = new EventEmitter<void>();
@@ -91,30 +95,67 @@ export class CreateVaultComponent {
   }
 
   async ngOnInit(): Promise<void> {
+    this.log.enter('CreateVaultComponent.ngOnInit');
     await this.loadGoogleConfig();
+    await this.tryResumeGoogleFromRedirect();
+    this.log.exit('CreateVaultComponent.ngOnInit', { step: this.step });
+  }
+
+  private async tryResumeGoogleFromRedirect(): Promise<void> {
+    this.log.enter('CreateVaultComponent.tryResumeGoogleFromRedirect');
+    const pending = loadPendingGoogleOAuth();
+    if (!pending || pending.flow !== 'create-vault') {
+      this.log.exit('CreateVaultComponent.tryResumeGoogleFromRedirect', { skipped: true });
+      return;
+    }
+
+    this.storageChoice = 'google';
+    this.step = 'google';
+
+    if (pending.oauthError) {
+      this.error = googleErrorMessage({ message: pending.oauthError });
+      clearPendingGoogleOAuth();
+      this.log.exit('CreateVaultComponent.tryResumeGoogleFromRedirect', { oauthError: pending.oauthError });
+      return;
+    }
+
+    if (!pending.accessToken) {
+      this.log.exit('CreateVaultComponent.tryResumeGoogleFromRedirect', { waitingForToken: true });
+      return;
+    }
+
+    this.googleBusy = true;
+    try {
+      const result = await this.googleLink.consumeCreateVaultPending();
+      if (result) {
+        this.googleClientId = result.clientId;
+        this.identityEmail = result.email;
+        this.identityId = result.id;
+        this.driveVerified = result.driveVerified;
+        this.driveFolderId = result.folderId || '';
+        this.log.step('Create-vault Google connect succeeded', {
+          email: result.email,
+          driveVerified: result.driveVerified,
+        });
+      }
+      this.log.exit('CreateVaultComponent.tryResumeGoogleFromRedirect', { success: Boolean(result) });
+    } catch (e) {
+      this.error = googleErrorMessage(
+        e,
+        'Could not connect Google. Try again, or go back and choose this device only.',
+      );
+      this.log.error('CreateVaultComponent.tryResumeGoogleFromRedirect failed', e);
+    } finally {
+      this.googleBusy = false;
+    }
   }
 
   private async loadGoogleConfig(): Promise<void> {
+    this.log.enter('CreateVaultComponent.loadGoogleConfig');
     const settings = await this.settings.load();
     this.googleClientId = await this.oauthConfig.resolve(settings.googleClientId);
     this.googleConfigured = Boolean(this.googleClientId);
-  }
-
-  private async prepareGoogleSignIn(): Promise<void> {
-    if (!this.googleConfigured) {
-      this.googleAuthReady = false;
-      return;
-    }
-    this.googleAuthPreparing = true;
-    this.googleAuthReady = false;
-    try {
-      await this.googleLink.prepareSignIn(this.googleClientId);
-      this.googleAuthReady = true;
-    } catch {
-      this.googleAuthReady = false;
-    } finally {
-      this.googleAuthPreparing = false;
-    }
+    this.log.exit('CreateVaultComponent.loadGoogleConfig', { googleConfigured: this.googleConfigured });
   }
 
   async checkUsername(): Promise<void> {
@@ -188,7 +229,6 @@ export class CreateVaultComponent {
   continueFromStorage(): void {
     this.error = '';
     this.step = this.wantsGoogleSync ? 'google' : 'recovery';
-    if (this.wantsGoogleSync) void this.prepareGoogleSignIn();
   }
 
   continueFromGoogle(): void {
@@ -212,64 +252,45 @@ export class CreateVaultComponent {
   }
 
   connectGoogle(): void {
+    this.log.enter('CreateVaultComponent.connectGoogle');
     this.error = '';
     if (!this.resolvedGoogleClientId) {
       this.error = 'Google sign-in is not configured on this site.';
-      return;
-    }
-    if (!this.googleAuthReady) {
-      this.error = 'Google sign-in is still loading. Wait a second and try again.';
-      void this.prepareGoogleSignIn();
+      this.log.warn('CreateVaultComponent.connectGoogle: no client ID');
       return;
     }
 
-    this.googleBusy = true;
     this.driveVerified = false;
     this.driveFolderId = '';
-
-    void this.googleLink
-      .connectAndVerifyFromGesture({
-        clientId: this.resolvedGoogleClientId,
-        username: this.loginUsername,
-        persist: false,
-        selectAccount: true,
-        verifyDrive: true,
-      })
-      .then((result) => {
-        this.googleClientId = result.clientId;
-        this.identityEmail = result.email;
-        this.identityId = result.id;
-        this.driveVerified = result.driveVerified;
-        this.driveFolderId = result.folderId || '';
-      })
-      .catch((e) => {
-        const partial = (e as Error & { partial?: { email: string; id: string; clientId: string } }).partial;
-        if (partial) {
-          this.identityEmail = partial.email;
-          this.identityId = partial.id;
-          this.googleClientId = partial.clientId;
-        }
-        this.error = googleErrorMessage(
-          e,
-          'Could not connect Google. Try again, or go back and choose this device only.',
-        );
-      })
-      .finally(() => {
-        this.googleBusy = false;
-      });
+    this.log.step('Starting create-vault Google redirect', { username: this.loginUsername });
+    this.googleLink.startRedirectConnect({
+      clientId: this.resolvedGoogleClientId,
+      username: this.loginUsername,
+      selectAccount: true,
+      verifyDrive: true,
+      persist: false,
+      flow: 'create-vault',
+    });
+    this.log.exit('CreateVaultComponent.connectGoogle');
   }
 
   async verifyDriveAgain(): Promise<void> {
-    if (!this.identityEmail || !this.resolvedGoogleClientId) return;
+    this.log.enter('CreateVaultComponent.verifyDriveAgain');
+    if (!this.identityEmail || !this.resolvedGoogleClientId) {
+      this.log.exit('CreateVaultComponent.verifyDriveAgain', { skipped: true });
+      return;
+    }
     this.error = '';
     this.driveVerifyBusy = true;
     try {
       const result = await this.googleLink.verifyDriveAccess(this.resolvedGoogleClientId, this.loginUsername);
       this.driveVerified = true;
       this.driveFolderId = result.folderId || '';
+      this.log.exit('CreateVaultComponent.verifyDriveAgain', { driveVerified: true, folderId: this.driveFolderId });
     } catch (e) {
       this.driveVerified = false;
       this.error = googleErrorMessage(e, this.hints.driveVerifyFailed);
+      this.log.error('CreateVaultComponent.verifyDriveAgain failed', e);
     } finally {
       this.driveVerifyBusy = false;
     }

@@ -242,33 +242,33 @@
         }
         <div class="modal__actions modal__actions--inline">
           @if (googleIdentityEmail) {
-            <button type="button" class="btn btn--ghost" [disabled]="googleBusy" (click)="changeIdentityGoogleAccount()">
+            <button type="button" class="btn btn--ghost" (click)="changeIdentityGoogleAccount()">
               <span>Change primary</span>
             </button>
           } @else {
-            <button type="button" class="btn btn--primary" [disabled]="googleBusy" (click)="connectIdentityGoogle()">
+            <button type="button" class="btn btn--primary" (click)="connectIdentityGoogle()">
               <app-icon icon="shield"></app-icon>
-              <span>{{ googleBusy ? 'Connecting…' : 'Connect primary Google' }}</span>
+              <span>Connect primary Google</span>
             </button>
           }
           @if (storageMode !== 'device') {
             @if (!driveIsVerified && (googleAccountEmail || googleIdentityEmail)) {
-              <button type="button" class="btn btn--ghost" [disabled]="driveVerifyBusy || googleBusy" (click)="verifyDriveAccess()">
+              <button type="button" class="btn btn--ghost" [disabled]="driveVerifyBusy" (click)="verifyDriveAccess()">
                 <span>{{ driveVerifyBusy ? 'Verifying…' : 'Verify Drive access' }}</span>
               </button>
             }
             @if (googleAccountEmail && !driveUsesSameAccount) {
-              <button type="button" class="btn btn--ghost" [disabled]="googleBusy" (click)="changeGoogleAccount()">
+              <button type="button" class="btn btn--ghost" (click)="changeGoogleAccount()">
                 <span>Change Drive account</span>
               </button>
             } @else if (googleIdentityEmail && driveUsesSameAccount) {
-              <button type="button" class="btn btn--ghost" [disabled]="googleBusy" (click)="connectDriveGoogle()">
+              <button type="button" class="btn btn--ghost" (click)="connectDriveGoogle()">
                 <span>Use different Drive account</span>
               </button>
             }
           }
           @if (googleIdentityEmail) {
-            <button type="button" class="btn btn--danger" [disabled]="googleBusy" (click)="disconnectGoogleAccount()">
+            <button type="button" class="btn btn--danger" (click)="disconnectGoogleAccount()">
               <span>Disconnect all</span>
             </button>
           }

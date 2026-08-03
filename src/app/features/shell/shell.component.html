@@ -33,7 +33,7 @@
                   <li role="presentation">
                     <button type="button" class="search-suggestion" role="option" (click)="openSearchResult(item.id)">
                       <span class="search-suggestion__icon" aria-hidden="true">
-                        <app-icon [name]="typeIcon(item.type)"></app-icon>
+                        <app-icon [icon]="typeIcon(item.type)"></app-icon>
                       </span>
                       <span class="search-suggestion__body">
                         <span class="search-suggestion__title">{{ item.title }}</span>
@@ -58,7 +58,6 @@
       <div class="topbar__actions">
         @if (view === 'dash' && !showSearch) {
           <div class="topbar-profile">
-            <span class="topbar-profile__label">Profile</span>
             <div class="profile-picker" [class.is-open]="profileMenuOpen" (click)="$event.stopPropagation()">
               <button
                 type="button"
@@ -99,11 +98,11 @@
             </button>
           </div>
         }
-        <button class="btn btn--ghost topbar__action-btn" type="button" [class.is-active]="showSearch" (click)="toggleSearch()">
+        <button class="btn btn--ghost topbar__action-btn topbar__action-btn--search" type="button" [class.is-active]="showSearch" (click)="toggleSearch()">
           <app-icon [icon]="showSearch ? 'x' : 'search'"></app-icon>
           <span class="topbar__btn-label">{{ showSearch ? 'Close' : 'Search' }}</span>
         </button>
-        <button class="btn btn--primary topbar__action-btn" type="button" (click)="openNew()">
+        <button class="btn btn--primary topbar__action-btn topbar__action-btn--add" type="button" (click)="openNew()">
           <app-icon icon="plus"></app-icon>
           <span class="topbar__btn-label">Add item</span>
         </button>
@@ -116,7 +115,7 @@
             title="Activity history"
             aria-label="Activity history"
           >
-            <img class="topbar__action-icon" src="icons/activity-history.svg" width="20" height="20" alt="" />
+            <img class="topbar__action-icon" src="icons/activity-history.svg" alt="" />
           </button>
           <button
             class="btn btn--ghost btn--icon topbar__account-btn"
@@ -125,7 +124,7 @@
             title="Account settings"
             aria-label="Account settings"
           >
-            <img class="topbar__action-icon" src="icons/account-settings.svg" width="20" height="20" alt="" />
+            <img class="topbar__action-icon" src="icons/account-settings.svg" alt="" />
           </button>
           <button
             class="btn btn--ghost btn--icon topbar__lock-btn"
@@ -134,7 +133,7 @@
             title="Lock vault"
             aria-label="Lock vault"
           >
-            <img class="topbar__action-icon topbar__action-icon--logout" src="icons/logout.svg" width="20" height="20" alt="" />
+            <img class="topbar__action-icon topbar__action-icon--logout" src="icons/logout.svg" alt="" />
           </button>
       </div>
     </header>
@@ -180,7 +179,7 @@
                 <article class="category-card">
                   <button type="button" class="category-card__main" (click)="openCategory(c.id)">
                     <span class="category-card__icon" [attr.data-tone]="i % 5">
-                      <app-icon [name]="c.icon"></app-icon>
+                      <app-icon [icon]="c.icon"></app-icon>
                     </span>
                     <span class="category-card__text">
                       <span class="category-card__name">{{ c.label }}</span>
@@ -263,7 +262,7 @@
           @for (item of items; track item.id) {
             <button class="list-item" type="button" [class.is-active]="selectedId === item.id" (click)="selectItem(item.id)">
               <span class="list-item__icon" aria-hidden="true">
-                <app-icon [name]="typeIcon(item.type)"></app-icon>
+                <app-icon [icon]="typeIcon(item.type)"></app-icon>
               </span>
               <span class="list-item__body">
                 <span class="list-item__type">{{ itemCategoryName(item) }}</span>
@@ -289,7 +288,7 @@
           } @else if (view === 'detail' && selected) {
             <div class="detail-head">
               <p class="detail-head__type">
-                <app-icon [name]="typeIcon(selected.type)"></app-icon>
+                <app-icon [icon]="typeIcon(selected.type)"></app-icon>
                 {{ typeLabel(selected.type) }}
               </p>
               <h2>{{ selected.title }}</h2>
@@ -345,7 +344,7 @@
     <div class="modal modal--editor" (click)="$event.stopPropagation()" role="dialog">
       <header class="modal__head">
         <h2>
-          <app-icon [name]="editingItemId ? 'pencil' : 'plus'"></app-icon>
+          <app-icon [icon]="editingItemId ? 'pencil' : 'plus'"></app-icon>
           {{ editingItemId ? 'Edit item' : 'New item' }}
         </h2>
         <div class="modal__head-actions">
@@ -376,7 +375,7 @@
           } @else {
             <div class="type-list type-list--readonly">
               <span class="type-option is-active" aria-current="true">
-                <app-icon [name]="typeIcon(draftType)"></app-icon>
+                <app-icon [icon]="typeIcon(draftType)"></app-icon>
                 <span>{{ typeLabel(draftType) }}</span>
               </span>
             </div>
@@ -394,7 +393,7 @@
                 [class.is-active]="isDefaultCategoryActive(t.id)"
                 (click)="selectDefaultCategory(t.id)"
               >
-                <app-icon [name]="t.icon"></app-icon>
+                <app-icon [icon]="t.icon"></app-icon>
                 <span>{{ t.label }}</span>
               </button>
             }
@@ -429,7 +428,7 @@
           <div class="type-list">
             @for (t of types; track t.id) {
               <button type="button" class="type-option" [class.is-active]="draftType === t.id" (click)="draftType = t.id; onTypeChange()">
-                <app-icon [name]="t.icon"></app-icon>
+                <app-icon [icon]="t.icon"></app-icon>
                 <span>{{ t.label }}</span>
               </button>
             }
@@ -447,9 +446,9 @@
           <div class="field">
             <label>{{ f.label }}</label>
             @if (f.type === 'textarea') {
-              <textarea [(ngModel)]="draftFields[f.name]" [name]="'f-' + f.name" rows="3"></textarea>
+              <textarea [(ngModel)]="draftFields[f.name]" name="f-{{ f.name }}" rows="3"></textarea>
             } @else if (f.type === 'select' && f.options) {
-              <select [(ngModel)]="draftFields[f.name]" [name]="'f-' + f.name">
+              <select [(ngModel)]="draftFields[f.name]" name="f-{{ f.name }}">
                 @for (o of f.options; track o.value) {
                   <option [value]="o.value">{{ o.label }}</option>
                 }
@@ -458,7 +457,7 @@
               <input
                 [type]="f.type === 'password' ? 'password' : f.type === 'date' ? 'date' : f.type === 'email' ? 'email' : f.type === 'url' ? 'url' : 'text'"
                 [(ngModel)]="draftFields[f.name]"
-                [name]="'f-' + f.name"
+                name="f-{{ f.name }}"
               />
             }
           </div>
@@ -504,16 +503,16 @@
                 <div class="extra-field-card__body">
                   <div class="field">
                     <label>Label</label>
-                    <input [(ngModel)]="c.label" [name]="'cl-' + i" placeholder="e.g. Policy number" />
+                    <input [(ngModel)]="c.label" name="cl-{{ i }}" placeholder="e.g. Policy number" />
                   </div>
                   <div class="field">
                     <label>Value</label>
-                    <input [(ngModel)]="c.value" [name]="'cv-' + i" [type]="c.secret ? 'password' : 'text'" placeholder="Enter value" />
+                    <input [(ngModel)]="c.value" name="cv-{{ i }}" [type]="c.secret ? 'password' : 'text'" placeholder="Enter value" />
                   </div>
                 </div>
                 <label class="secret-pill" [class.is-on]="c.secret">
-                  <input type="checkbox" [(ngModel)]="c.secret" [name]="'cs-' + i" />
-                  <app-icon [name]="c.secret ? 'lock' : 'eye'"></app-icon>
+                  <input type="checkbox" [(ngModel)]="c.secret" name="cs-{{ i }}" />
+                  <app-icon [icon]="c.secret ? 'lock' : 'eye'"></app-icon>
                   <span>{{ c.secret ? 'Secret — hidden value' : 'Mark as secret' }}</span>
                 </label>
               </article>
@@ -670,7 +669,7 @@
             </button>
           }
           <button type="button" class="btn btn--primary" (click)="saveProfile()">
-            <app-icon [name]="profileEditingId ? 'check' : 'plus'"></app-icon>
+            <app-icon [icon]="profileEditingId ? 'check' : 'plus'"></app-icon>
             <span>{{ profileEditingId ? 'Save changes' : 'Add member' }}</span>
           </button>
         </div>
@@ -731,7 +730,7 @@
     <div class="modal modal--confirm" (click)="$event.stopPropagation()" role="alertdialog" aria-modal="true">
       <header class="modal__head">
         <h2>
-          <app-icon [name]="confirmDanger ? 'trash' : 'shield'"></app-icon>
+          <app-icon [icon]="confirmDanger ? 'trash' : 'shield'"></app-icon>
           {{ confirmTitle }}
         </h2>
         @if (!confirmInfoOnly) {

@@ -10,8 +10,8 @@
           class="welcome-hero"
           src="images/welcome-mobile.png"
           [alt]="appName + ' — Save it, Forget it.'"
-          width="430"
-          height="932"
+          width="482"
+          height="1024"
           decoding="async"
         />
       </picture>
@@ -19,7 +19,7 @@
       <div class="welcome-actions">
         @if (hasVault) {
           <button class="welcome-btn welcome-btn--primary" type="button" (click)="unlock.emit()">
-            <app-icon name="lock"></app-icon>
+            <app-icon icon="lock"></app-icon>
             <span>Unlock {{ appName }}</span>
           </button>
           <button class="welcome-btn welcome-btn--secondary" type="button" (click)="create.emit()">
@@ -27,7 +27,7 @@
           </button>
         } @else {
           <button class="welcome-btn welcome-btn--primary" type="button" (click)="unlock.emit()">
-            <app-icon name="lock"></app-icon>
+            <app-icon icon="lock"></app-icon>
             <span>Unlock {{ appName }}</span>
           </button>
           <button class="welcome-btn welcome-btn--secondary" type="button" (click)="create.emit()">

@@ -135,13 +135,11 @@
           <button
             class="btn btn--primary btn--wide"
             type="button"
-            [disabled]="googleBusy || busy || !googleConfigured || googleAuthPreparing"
+            [disabled]="googleBusy || busy || !googleConfigured"
             (click)="connectGoogle()"
           >
             @if (googleBusy) {
               <span>Connecting and verifying…</span>
-            } @else if (googleAuthPreparing) {
-              <span>Preparing Google sign-in…</span>
             } @else {
               <span>Sign in with Google</span>
             }

@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { GoogleAccountService } from '../../core/auth/google-account.service';
 import { googleErrorMessage } from '../../core/auth/google-errors';
 import { GoogleDriveLinkService } from '../../core/auth/google-drive-link.service';
+import { consumeGoogleOAuthUiMessage } from '../../core/auth/google-oauth-redirect.util';
 import { GoogleOAuthConfigService } from '../../core/auth/google-oauth-config.service';
 import { APP_NAME } from '../../core/constants/app-name';
 import { APP_VERSION_LABEL } from '../../core/constants/app-version';
@@ -15,6 +16,7 @@ import { describeDriveLayout } from '../../core/sync/drive-layout.util';
 import { GuidancePanelComponent } from '../../shared/guidance-panel/guidance-panel.component';
 import { GuidanceService } from '../../core/services/guidance.service';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { LoggerService } from '../../core/services/logger.service';
 
 @Component({
   selector: 'app-account-settings',
@@ -29,6 +31,7 @@ export class AccountSettingsComponent implements OnChanges {
   private readonly googleLink = inject(GoogleDriveLinkService);
   private readonly oauthConfig = inject(GoogleOAuthConfigService);
   private readonly guidance = inject(GuidanceService);
+  private readonly log = inject(LoggerService);
   readonly sync = inject(SyncService);
   readonly appName = APP_NAME;
   readonly appVersionLabel = APP_VERSION_LABEL;
@@ -63,7 +66,6 @@ export class AccountSettingsComponent implements OnChanges {
   syncBusy = false;
   googleError = '';
   googleSuccess = '';
-  googleBusy = false;
   driveVerifiedAt: string | null = null;
   driveVerifyBusy = false;
 
@@ -77,6 +79,7 @@ export class AccountSettingsComponent implements OnChanges {
   googleConfirmTitle = '';
   googleConfirmMessage = '';
   guidanceResetSuccess = '';
+  resolvedGoogleClientId = '';
   private googleConfirmAction: (() => void | Promise<void>) | null = null;
 
   ngOnChanges(): void {
@@ -91,6 +94,7 @@ export class AccountSettingsComponent implements OnChanges {
   }
 
   load(): void {
+    this.log.enter('AccountSettingsComponent.load');
     this.ownerError = '';
     this.ownerSuccess = '';
     this.passwordError = '';
@@ -113,6 +117,13 @@ export class AccountSettingsComponent implements OnChanges {
     void this.vault.hasCodeRecovery().then((ready) => {
       this.codeRecoveryReady = ready;
     });
+    const oauthUi = consumeGoogleOAuthUiMessage();
+    if (oauthUi?.success) this.googleSuccess = oauthUi.success;
+    if (oauthUi?.error) this.googleError = oauthUi.error;
+    this.log.exit('AccountSettingsComponent.load', {
+      hasGoogleSuccess: Boolean(oauthUi?.success),
+      hasGoogleError: Boolean(oauthUi?.error),
+    });
   }
 
   get vaultUsername(): string {
@@ -129,6 +140,7 @@ export class AccountSettingsComponent implements OnChanges {
 
   private async resolveClientId(preferred?: string): Promise<void> {
     this.googleClientId = await this.oauthConfig.resolve(preferred);
+    this.resolvedGoogleClientId = this.googleClientId;
   }
 
   async resetGuidanceTips(): Promise<void> {
@@ -272,98 +284,63 @@ export class AccountSettingsComponent implements OnChanges {
     }
   }
 
-  async connectGoogle(): Promise<void> {
-    await this.connectIdentityGoogle();
+  connectGoogle(): void {
+    this.log.enter('AccountSettingsComponent.connectGoogle');
+    this.connectIdentityGoogle();
   }
 
-  async connectIdentityGoogle(): Promise<void> {
+  connectIdentityGoogle(): void {
+    this.log.enter('AccountSettingsComponent.connectIdentityGoogle');
     this.googleError = '';
     this.googleSuccess = '';
-    this.googleBusy = true;
-    try {
-      const clientId = await this.oauthConfig.resolve(this.googleClientId);
-      if (clientId) {
-        await this.googleAccount.saveClientId(clientId);
-        this.googleClientId = clientId;
-      }
-      const verifyDrive = this.storageMode !== 'device';
-      const result = await this.googleLink.connectAndVerify({
-        clientId,
-        username: this.vaultUsername,
-        selectAccount: true,
-        verifyDrive,
-      });
-      this.googleIdentityEmail = result.email;
-      await this.vault.syncRecoveryEmail(result.email);
-      const syncPatch: Partial<VaultSyncAccount> = {
-        googleClientId: result.clientId,
-        googleIdentityEmail: result.email,
-        googleIdentityId: result.id,
-        googleOnboardingComplete: true,
-      };
-      if (this.driveUsesSameAccount) {
-        this.googleAccountEmail = result.email;
-        syncPatch.googleAccountEmail = result.email;
-        syncPatch.googleAccountId = result.id;
-        syncPatch.driveUsesSameGoogleAccount = true;
-      }
-      if (result.driveVerified) {
-        syncPatch.driveVerifiedAt = result.verifiedAt ?? null;
-        syncPatch.driveFolderId = result.folderId ?? '';
-        this.driveVerifiedAt = syncPatch.driveVerifiedAt ?? null;
-      }
-      await this.vault.updateSyncAccount(syncPatch);
-      void this.vault.uploadRecoveryIfPossible();
-      this.googleSuccess = result.driveVerified
-        ? `Primary account connected and Drive verified (${result.email}).`
-        : `Primary account connected as ${result.email}.`;
-      this.updated.emit();
-    } catch (e) {
-      this.googleError = googleErrorMessage(e, 'Could not connect Google account. Try again.');
-    } finally {
-      this.googleBusy = false;
+    const clientId = this.resolvedGoogleClientId.trim();
+    if (!clientId) {
+      this.googleError = 'Google sign-in is not configured on this site.';
+      this.log.warn('AccountSettingsComponent.connectIdentityGoogle: no client ID');
+      return;
     }
+
+    const verifyDrive = this.storageMode !== 'device';
+    this.log.step('Starting identity Google redirect', { verifyDrive, storageMode: this.storageMode });
+    this.googleLink.startRedirectConnect({
+      clientId,
+      username: this.vaultUsername,
+      selectAccount: true,
+      verifyDrive,
+      persist: true,
+      flow: 'account-identity',
+      openSettings: true,
+    });
+    this.log.exit('AccountSettingsComponent.connectIdentityGoogle');
   }
 
-  async connectDriveGoogle(): Promise<void> {
+  connectDriveGoogle(): void {
+    this.log.enter('AccountSettingsComponent.connectDriveGoogle');
     this.googleError = '';
     this.googleSuccess = '';
-    this.googleBusy = true;
-    try {
-      const clientId = await this.oauthConfig.resolve(this.googleClientId);
-      if (clientId) {
-        await this.googleAccount.saveClientId(clientId);
-        this.googleClientId = clientId;
-      }
-      this.googleAccount.clearAuth();
-      const result = await this.googleLink.connectAndVerify({
-        clientId,
-        username: this.vaultUsername,
-        selectAccount: true,
-        verifyDrive: true,
-      });
-      this.googleAccountEmail = result.email;
-      await this.vault.updateSyncAccount({
-        googleClientId: result.clientId,
-        googleAccountEmail: result.email,
-        googleAccountId: result.id,
-        driveUsesSameGoogleAccount: false,
-        driveVerifiedAt: result.verifiedAt ?? null,
-        driveFolderId: result.folderId ?? '',
-      });
-      this.driveVerifiedAt = result.verifiedAt ?? null;
-      void this.vault.uploadRecoveryIfPossible();
-      void this.sync.pushSync();
-      this.googleSuccess = `Drive backup connected and verified (${result.email}).`;
-      this.updated.emit();
-    } catch (e) {
-      this.googleError = googleErrorMessage(e, 'Could not connect the Drive Google account. Try again.');
-    } finally {
-      this.googleBusy = false;
+    const clientId = this.resolvedGoogleClientId.trim();
+    if (!clientId) {
+      this.googleError = 'Google sign-in is not configured on this site.';
+      this.log.warn('AccountSettingsComponent.connectDriveGoogle: no client ID');
+      return;
     }
+
+    this.googleAccount.clearAuth();
+    this.log.step('Starting Drive-only Google redirect');
+    this.googleLink.startRedirectConnect({
+      clientId,
+      username: this.vaultUsername,
+      selectAccount: true,
+      verifyDrive: true,
+      persist: true,
+      flow: 'account-drive',
+      openSettings: true,
+    });
+    this.log.exit('AccountSettingsComponent.connectDriveGoogle');
   }
 
   async verifyDriveAccess(): Promise<void> {
+    this.log.enter('AccountSettingsComponent.verifyDriveAccess');
     this.googleError = '';
     this.googleSuccess = '';
     this.driveVerifyBusy = true;
@@ -376,8 +353,10 @@ export class AccountSettingsComponent implements OnChanges {
       });
       this.driveVerifiedAt = result.verifiedAt ?? null;
       this.googleSuccess = `Drive verified — folder ready at ${result.folderPath}.`;
+      this.log.exit('AccountSettingsComponent.verifyDriveAccess', { folderId: result.folderId });
     } catch (e) {
       this.googleError = googleErrorMessage(e, this.hints.driveVerifyFailed);
+      this.log.error('AccountSettingsComponent.verifyDriveAccess failed', e);
     } finally {
       this.driveVerifyBusy = false;
     }
@@ -387,8 +366,8 @@ export class AccountSettingsComponent implements OnChanges {
     this.openGoogleConfirm(
       'Change Drive backup account?',
       'Pick a different Google account for encrypted Drive backup. Your primary account stays used for recovery.',
-      async () => {
-        await this.connectDriveGoogle();
+      () => {
+        this.connectDriveGoogle();
       },
     );
   }
@@ -397,8 +376,8 @@ export class AccountSettingsComponent implements OnChanges {
     this.openGoogleConfirm(
       'Change primary Google account?',
       'Your primary account is used for password recovery. Changing it requires syncing recovery again.',
-      async () => {
-        await this.connectIdentityGoogle();
+      () => {
+        this.connectIdentityGoogle();
       },
     );
   }
@@ -408,6 +387,7 @@ export class AccountSettingsComponent implements OnChanges {
       'Disconnect Google accounts?',
       `Remove Google from ${APP_NAME}? Drive backup and Google password recovery will stop working until you link accounts again.`,
       async () => {
+        this.log.enter('AccountSettingsComponent.disconnectGoogleAccount');
         await this.googleAccount.disconnect();
         this.googleAccountEmail = '';
         this.googleIdentityEmail = '';
@@ -415,6 +395,7 @@ export class AccountSettingsComponent implements OnChanges {
         this.googleSuccess = 'Google accounts disconnected.';
         this.googleError = '';
         this.updated.emit();
+        this.log.exit('AccountSettingsComponent.disconnectGoogleAccount');
       },
     );
   }

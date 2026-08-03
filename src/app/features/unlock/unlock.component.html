@@ -6,31 +6,26 @@
     <form (ngSubmit)="submit()">
       <div class="field">
         <label for="unlock-username">Username <span class="field-label__required" aria-hidden="true">*</span></label>
-        @if (knownUsernames.length > 1) {
-          <select id="unlock-username" name="username" [(ngModel)]="username" required>
-            @for (u of knownUsernames; track u) {
-              <option [value]="u">{{ u }}</option>
-            }
-          </select>
-        } @else {
-          <input
-            id="unlock-username"
-            name="username"
-            type="text"
-            required
-            [(ngModel)]="username"
-            autocomplete="username"
-            placeholder="your_username"
-            spellcheck="false"
-            autocapitalize="off"
-            autofocus
-          />
-        }
+        <input
+          id="unlock-username"
+          name="username"
+          type="text"
+          required
+          [(ngModel)]="username"
+          autocomplete="username"
+          placeholder="your_username"
+          spellcheck="false"
+          autocapitalize="off"
+          autofocus
+        />
       </div>
       <div class="field">
         <label for="mp">Master password <span class="field-label__required" aria-hidden="true">*</span></label>
         <input id="mp" name="password" type="password" required [(ngModel)]="password" autocomplete="current-password" />
       </div>
+      @if (oauthResumeHint) {
+        <p class="auth-sub">{{ oauthResumeHint }}</p>
+      }
       @if (error) {
         <p class="auth-error">{{ error }}</p>
       }

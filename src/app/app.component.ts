@@ -4,12 +4,13 @@ import { ShellComponent } from './features/shell/shell.component';
 import { UnlockComponent } from './features/unlock/unlock.component';
 import { ForgotPasswordComponent } from './features/forgot-password/forgot-password.component';
 import { WelcomeComponent } from './features/welcome/welcome.component';
-import { APP_NAME } from './core/constants/app-name';
 import { SessionService } from './core/services/session.service';
 import { ThemeService } from './core/services/theme.service';
 import { VaultService } from './core/services/vault.service';
 import { SyncService } from './core/sync/sync.service';
 import { GoogleOAuthConfigService } from './core/auth/google-oauth-config.service';
+import { loadPendingGoogleOAuth } from './core/auth/google-oauth-redirect.util';
+import { LoggerService } from './core/services/logger.service';
 
 type Screen = 'welcome' | 'create' | 'unlock' | 'forgot' | 'app';
 
@@ -26,20 +27,31 @@ export class AppComponent implements OnInit {
   private readonly theme = inject(ThemeService);
   private readonly sync = inject(SyncService);
   private readonly oauthConfig = inject(GoogleOAuthConfigService);
+  private readonly log = inject(LoggerService);
 
   screen: Screen = 'welcome';
   hasVault = false;
 
   async ngOnInit(): Promise<void> {
-    // document.title = APP_NAME;
-    try {    
+    this.log.enter('AppComponent.ngOnInit');
+    try {
       this.theme.init();
       this.sync.init();
       void this.oauthConfig.preload();
       this.hasVault = await this.vault.hasAnyVault();
-      this.screen = 'welcome';
+      const pendingGoogle = loadPendingGoogleOAuth();
+      if (pendingGoogle?.flow === 'create-vault' && (pendingGoogle.accessToken || pendingGoogle.oauthError)) {
+        this.log.step('Routing to create-vault to resume Google OAuth', {
+          hasToken: Boolean(pendingGoogle.accessToken),
+          hasError: Boolean(pendingGoogle.oauthError),
+        });
+        this.screen = 'create';
+      } else {
+        this.screen = 'welcome';
+      }
+      this.log.exit('AppComponent.ngOnInit', { screen: this.screen, hasVault: this.hasVault });
     } catch (err) {
-      console.error('App init failed', err);
+      this.log.error('App init failed', err);
       this.screen = 'welcome';
       this.hasVault = false;
     }

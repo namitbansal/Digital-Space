@@ -4,6 +4,8 @@ import { APP_NAME } from '../../core/constants/app-name';
 import { GuidancePanelComponent } from '../../shared/guidance-panel/guidance-panel.component';
 import { UserContextService } from '../../core/services/user-context.service';
 import { VaultService } from '../../core/services/vault.service';
+import { hasPendingGoogleOAuthWithToken } from '../../core/auth/google-oauth-redirect.util';
+import { LoggerService } from '../../core/services/logger.service';
 
 @Component({
   selector: 'app-unlock',
@@ -15,6 +17,7 @@ export class UnlockComponent implements OnInit {
   readonly appName = APP_NAME;
   private readonly vault = inject(VaultService);
   private readonly users = inject(UserContextService);
+  private readonly log = inject(LoggerService);
 
   @Output() unlocked = new EventEmitter<void>();
   @Output() forgot = new EventEmitter<void>();
@@ -22,16 +25,22 @@ export class UnlockComponent implements OnInit {
 
   username = '';
   password = '';
-  knownUsernames: string[] = [];
   error = '';
   busy = false;
+  oauthResumeHint = '';
 
   ngOnInit(): void {
-    this.knownUsernames = this.users.getKnownUsernames();
-    this.username = this.users.getActiveUsername() || this.knownUsernames[0] || '';
+    this.log.enter('UnlockComponent.ngOnInit');
+    this.username = this.users.getActiveUsername() || this.users.getKnownUsernames()[0] || '';
+    if (hasPendingGoogleOAuthWithToken()) {
+      this.oauthResumeHint = 'Unlock your vault to finish connecting Google.';
+      this.log.step('Pending Google OAuth token detected — unlock required to resume');
+    }
+    this.log.exit('UnlockComponent.ngOnInit', { hasOauthResumeHint: Boolean(this.oauthResumeHint) });
   }
 
   async submit(): Promise<void> {
+    this.log.enter('UnlockComponent.submit', { username: this.username });
     this.error = '';
     if (!this.username.trim()) {
       this.error = 'Enter your username.';
@@ -41,9 +50,12 @@ export class UnlockComponent implements OnInit {
     try {
       await this.vault.unlockVault(this.username, this.password);
       this.password = '';
+      this.log.step('Vault unlocked successfully');
       this.unlocked.emit();
+      this.log.exit('UnlockComponent.submit', { success: true });
     } catch (err) {
       const code = (err as Error & { code?: string }).code;
+      this.log.error('UnlockComponent.submit failed', { code, err });
       if (code === 'NO_VAULT') {
         this.error = 'No vault found for this username on this device. Try another username or create a new vault.';
       } else if (code === 'USERNAME_INVALID') {

@@ -44,15 +44,7 @@ const P: Record<string, string> = {
   ],
 })
 export class IconComponent implements OnChanges {
-  /** Use `icon` — avoid `name` (reserved / unreliable on host elements). */
   @Input() icon = 'sparkles';
-  /** @deprecated Use `icon` instead. */
-  @Input() set name(value: string) {
-    if (value) {
-      this.icon = value;
-      this.render();
-    }
-  }
   svg: SafeHtml = '';
 
   constructor(private s: DomSanitizer) {}

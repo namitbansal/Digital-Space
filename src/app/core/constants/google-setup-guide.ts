@@ -3,7 +3,8 @@ export const GOOGLE_CLIENT_ID_STEPS = [
   'Open Google Cloud Console → APIs & Services → Credentials.',
   'Enable the Google Drive API for your project (APIs & Services → Library).',
   'Create an OAuth client ID (type: Web application).',
-  'Add authorized JavaScript origins: http://localhost:5173 and your live app URL.',
+  'Add authorized JavaScript origins: http://localhost:5173 and https://namitbansal.github.io',
+  'Add authorized redirect URIs: http://localhost:5173/ and https://namitbansal.github.io/digital_space/',
   'Paste the Client ID in public/config/google-oauth.json (copy from google-oauth.example.json), or set DEFAULT_GOOGLE_CLIENT_ID in google-oauth.config.ts.',
 ] as const;
 

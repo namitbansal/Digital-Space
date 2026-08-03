@@ -4,6 +4,8 @@ import { emptyFieldsForType, getItemType, listItemTypes } from '../../core/items
 import { AttachmentMeta, CustomField, Folder, Profile, VaultItem } from '../../core/models/vault.models';
 import { AttachmentService } from '../../core/services/attachment.service';
 import { VaultService } from '../../core/services/vault.service';
+import { GoogleDriveLinkService } from '../../core/auth/google-drive-link.service';
+import { LoggerService } from '../../core/services/logger.service';
 import { AccountSettingsComponent } from '../account-settings/account-settings.component';
 import { ActivityHistoryComponent } from '../activity-history/activity-history.component';
 import { GuidanceId } from '../../core/constants/page-guidance';
@@ -36,6 +38,8 @@ const PROFILE_RELATIONSHIPS = [
 export class ShellComponent implements OnInit {
   private readonly vault = inject(VaultService);
   private readonly attachments = inject(AttachmentService);
+  private readonly googleLink = inject(GoogleDriveLinkService);
+  private readonly log = inject(LoggerService);
   readonly profileRelationships = PROFILE_RELATIONSHIPS;
 
   @ViewChild('docInput') docInput?: ElementRef<HTMLInputElement>;
@@ -120,6 +124,21 @@ export class ShellComponent implements OnInit {
 
   ngOnInit(): void {
     this.refresh();
+    void this.resumeGoogleOAuth();
+  }
+
+  private async resumeGoogleOAuth(): Promise<void> {
+    this.log.enter('ShellComponent.resumeGoogleOAuth');
+    const resume = await this.googleLink.resumePendingConnect();
+    if (!resume) {
+      this.log.exit('ShellComponent.resumeGoogleOAuth', { resumed: false });
+      return;
+    }
+    this.log.step('OAuth resume result', resume);
+    if (resume.openSettings) {
+      this.showSettingsModal = true;
+    }
+    this.log.exit('ShellComponent.resumeGoogleOAuth', { resumed: true, openSettings: resume.openSettings });
   }
 
   refresh(): void {
