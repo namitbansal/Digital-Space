@@ -25,7 +25,7 @@ jobs:
           node-version: 20
           cache: npm
 
-      - run: npm ci
+      - run: npm install
       - run: npm run test
       - run: npm run build
       - run: cp dist/digital-space/browser/index.html dist/digital-space/browser/404.html
