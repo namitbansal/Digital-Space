@@ -19,6 +19,7 @@ import { GoogleAccountService } from '../auth/google-account.service';
 import { UserContextService } from './user-context.service';
 import { UserRegistryApiService } from './user-registry-api.service';
 import { normalizeUsername, usernameError } from '../utils/username';
+import { AppLogger } from './logger.util';
 
 @Injectable({ providedIn: 'root' })
 export class VaultService {
@@ -50,9 +51,13 @@ export class VaultService {
   }
 
   async hasAnyVault(): Promise<boolean> {
-    if (await this.store.hasLegacyVault()) return true;
+    if (await this.store.hasLegacyVault()) {
+      return true;
+    }
     for (const username of this.users.getKnownUsernames()) {
-      if (await this.store.hasVault(username)) return true;
+      if (await this.store.hasVault(username)) {
+        return true;
+      }
     }
     return false;
   }
@@ -107,7 +112,8 @@ export class VaultService {
         googleIdentityEmail: input.googleIdentityEmail,
       });
       this.users.rememberUsername(input.username);
-    } catch {
+    } catch (e) {
+      AppLogger.warn('VaultService.registerUserOnServer: registry offline or failed', e);
       /* local vault still works if registry is offline */
     }
   }
@@ -192,6 +198,7 @@ export class VaultService {
 
   private async persist(): Promise<void> {
     if (!this.session.isUnlocked() || !this.session.key || !this.session.vault || !this.session.envelope) {
+      AppLogger.error('VaultService.persist: LOCKED');
       throw new Error('LOCKED');
     }
     ensureVaultShape(this.session.vault);
@@ -206,9 +213,13 @@ export class VaultService {
 
   async createVault(username: string, password: string, ownerName?: string): Promise<{ vault: VaultData; recoveryCode: string }> {
     const nameErr = usernameError(username);
-    if (nameErr) throw new Error(nameErr);
+    if (nameErr) {
+      AppLogger.error('VaultService.createVault: invalid username', { nameErr });
+      throw new Error(nameErr);
+    }
     const normalized = normalizeUsername(username);
     if (await this.store.hasVault(normalized)) {
+      AppLogger.warn('VaultService.createVault: username already exists locally', { username: normalized });
       const err = new Error('USERNAME_LOCAL_EXISTS') as Error & { code?: string };
       err.code = 'USERNAME_LOCAL_EXISTS';
       throw err;
@@ -224,12 +235,14 @@ export class VaultService {
     await this.settings.save({ installedAt: nowIso(), vaultRevision: 1, recoveryEmail: undefined });
     this.session.setSession({ key, vault, envelope });
     this.users.rememberUsername(normalized);
+    AppLogger.info('Vault created', { username: normalized });
     return { vault, recoveryCode };
   }
 
   async unlockVault(username: string, password: string): Promise<VaultData> {
     const nameErr = usernameError(username);
     if (nameErr) {
+      AppLogger.error('VaultService.unlockVault: invalid username', { nameErr });
       const err = new Error('USERNAME_INVALID') as Error & { code?: string };
       err.code = 'USERNAME_INVALID';
       throw err;
@@ -243,6 +256,7 @@ export class VaultService {
       envelope = await this.store.loadEnvelope();
     }
     if (!envelope) {
+      AppLogger.warn('VaultService.unlockVault: no vault found', { username: normalized });
       const err = new Error('NO_VAULT') as Error & { code?: string };
       err.code = 'NO_VAULT';
       throw err;
@@ -251,10 +265,18 @@ export class VaultService {
     try {
       await this.registry.verifyLogin(normalized, password);
     } catch {
-      /* offline unlock still works via local envelope */
     }
 
-    const { vault, key } = await openVault(password, envelope);
+    let vault: VaultData;
+    let key: CryptoKey;
+    try {
+      ({ vault, key } = await openVault(password, envelope));
+    } catch (e) {
+      AppLogger.error('VaultService.unlockVault: wrong password', e);
+      const err = new Error('WRONG_PASSWORD') as Error & { code?: string };
+      err.code = 'WRONG_PASSWORD';
+      throw err;
+    }
     ensureVaultShape(vault);
     if (!vault.meta.username) {
       vault.meta.username = normalized;
@@ -279,6 +301,7 @@ export class VaultService {
     });
     await this.persist();
     this.syncService().refreshStatusMessage();
+    AppLogger.info('Vault unlocked', { username: normalized, revision: vault.meta.revision });
     return this.session.vault!;
   }
 
@@ -294,11 +317,12 @@ export class VaultService {
       });
       try {
         await this.persist();
-      } catch {
-        /* still clear */
+      } catch (e) {
+        AppLogger.warn('VaultService.lockVault: persist failed before clear', e);
       }
     }
     this.session.clear();
+    AppLogger.info('Vault locked', { reason });
   }
 
   listAuditLog(): AuditEntry[] {
@@ -617,10 +641,14 @@ export class VaultService {
   }
 
   async verifyMasterPassword(password: string): Promise<void> {
-    if (!this.session.envelope) throw new Error('LOCKED');
+    if (!this.session.envelope) {
+      AppLogger.error('VaultService.verifyMasterPassword: LOCKED');
+      throw new Error('LOCKED');
+    }
     try {
       await openVault(password, this.session.envelope);
-    } catch {
+    } catch (e) {
+      AppLogger.error('VaultService.verifyMasterPassword: WRONG_PASSWORD', e);
       const err = new Error('WRONG_PASSWORD') as Error & { code?: string };
       err.code = 'WRONG_PASSWORD';
       throw err;
@@ -654,6 +682,7 @@ export class VaultService {
         displayName: this.getSelfProfile()?.name,
       });
     }
+    AppLogger.info('Device-only onboarding complete', { username });
   }
 
   async completeGoogleOnboarding(input: {
@@ -672,12 +701,21 @@ export class VaultService {
   }): Promise<void> {
     await this.verifyMasterPassword(input.masterPassword);
     const clientId = input.googleClientId.trim();
-    if (!clientId) throw new Error('NO_CLIENT_ID');
-    if (!input.identityEmail || !input.identityId) throw new Error('NO_GOOGLE_IDENTITY');
+    if (!clientId) {
+      AppLogger.error('VaultService.completeGoogleOnboarding: NO_CLIENT_ID');
+      throw new Error('NO_CLIENT_ID');
+    }
+    if (!input.identityEmail || !input.identityId) {
+      AppLogger.error('VaultService.completeGoogleOnboarding: NO_GOOGLE_IDENTITY');
+      throw new Error('NO_GOOGLE_IDENTITY');
+    }
 
     const driveEmail = input.driveUsesSameAccount ? input.identityEmail : input.driveEmail;
     const driveId = input.driveUsesSameAccount ? input.identityId : input.driveId;
-    if (!driveEmail || !driveId) throw new Error('NO_DRIVE_ACCOUNT');
+    if (!driveEmail || !driveId) {
+      AppLogger.error('VaultService.completeGoogleOnboarding: NO_DRIVE_ACCOUNT');
+      throw new Error('NO_DRIVE_ACCOUNT');
+    }
     const syncToDrive = input.syncToDrive !== false;
 
     await this.settings.save({ googleClientId: clientId, recoveryEmail: input.identityEmail.trim().toLowerCase() });
@@ -714,8 +752,8 @@ export class VaultService {
       try {
         const layout = await this.drive().ensureDriveLayout(clientId, this.driveScope());
         driveFolderId = layout.rootId;
-      } catch {
-        /* best effort */
+      } catch (e) {
+        AppLogger.warn('VaultService.completeGoogleOnboarding: Drive layout failed (best effort)', e);
       }
     }
 
@@ -732,6 +770,7 @@ export class VaultService {
         driveAccountEmail: driveEmail,
       });
     }
+    AppLogger.info('Google onboarding complete', { username, driveFolderId, syncToDrive });
   }
 
   prepareRecoveryForUser(username: string): void {
@@ -823,7 +862,10 @@ export class VaultService {
     newPassword: string;
   }): Promise<void> {
     const clientId = input.clientId.trim();
-    if (!clientId) throw new Error('NO_CLIENT_ID');
+    if (!clientId) {
+      AppLogger.error('VaultService.resetMasterPasswordViaGoogle: NO_CLIENT_ID');
+      throw new Error('NO_CLIENT_ID');
+    }
     if (!input.newPassword || input.newPassword.length < 8) throw new Error('PASSWORD_TOO_SHORT');
 
     await this.google().ensureAccessToken(clientId);
@@ -865,6 +907,7 @@ export class VaultService {
       clientId,
       driveRootId: layout.rootId,
     });
+    AppLogger.info('Password reset via Google complete');
   }
 
   async resetMasterPasswordViaEmail(email: string, newPassword: string): Promise<void> {
@@ -910,6 +953,7 @@ export class VaultService {
       newPassword,
       auditSummary: 'Master password reset via email recovery PIN',
     });
+    AppLogger.info('Password reset via email complete');
   }
 
   async resetMasterPasswordViaCode(recoveryCode: string, newPassword: string): Promise<void> {
@@ -976,6 +1020,7 @@ export class VaultService {
         : 'Master password reset via recovery code',
       recoveryCode: useMaster ? undefined : recoveryCode,
     });
+    AppLogger.info('Password reset via recovery code complete', { useMaster });
   }
 
   async regenerateRecoveryCode(currentPassword: string): Promise<string> {

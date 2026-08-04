@@ -10,7 +10,7 @@ import { VaultService } from './core/services/vault.service';
 import { SyncService } from './core/sync/sync.service';
 import { GoogleOAuthConfigService } from './core/auth/google-oauth-config.service';
 import { loadPendingGoogleOAuth } from './core/auth/google-oauth-redirect.util';
-import { LoggerService } from './core/services/logger.service';
+import { LoggerService } from './core/services/logger.util';
 
 type Screen = 'welcome' | 'create' | 'unlock' | 'forgot' | 'app';
 
@@ -33,7 +33,6 @@ export class AppComponent implements OnInit {
   hasVault = false;
 
   async ngOnInit(): Promise<void> {
-    this.log.enter('AppComponent.ngOnInit');
     try {
       this.theme.init();
       this.sync.init();
@@ -41,15 +40,14 @@ export class AppComponent implements OnInit {
       this.hasVault = await this.vault.hasAnyVault();
       const pendingGoogle = loadPendingGoogleOAuth();
       if (pendingGoogle?.flow === 'create-vault' && (pendingGoogle.accessToken || pendingGoogle.oauthError)) {
-        this.log.step('Routing to create-vault to resume Google OAuth', {
+        this.screen = 'create';
+        this.log.info('Resume create-vault after OAuth', {
           hasToken: Boolean(pendingGoogle.accessToken),
           hasError: Boolean(pendingGoogle.oauthError),
         });
-        this.screen = 'create';
       } else {
         this.screen = 'welcome';
       }
-      this.log.exit('AppComponent.ngOnInit', { screen: this.screen, hasVault: this.hasVault });
     } catch (err) {
       this.log.error('App init failed', err);
       this.screen = 'welcome';
@@ -58,18 +56,19 @@ export class AppComponent implements OnInit {
   }
 
   goWelcome(): void {
-    this.screen = 'welcome';
+    this.navigate('welcome');
   }
   goCreate(): void {
-    this.screen = 'create';
+    this.navigate('create');
   }
   goUnlock(): void {
-    this.screen = 'unlock';
+    this.navigate('unlock');
   }
   goForgot(): void {
-    this.screen = 'forgot';
+    this.navigate('forgot');
   }
   onReady(): void {
+    this.log.info('Vault ready — opening app');
     this.hasVault = true;
     this.screen = 'app';
   }
@@ -80,5 +79,10 @@ export class AppComponent implements OnInit {
         this.screen = 'welcome';
       });
     }
+  }
+
+  private navigate(screen: Screen): void {
+    this.log.info(`Screen: ${screen}`, { from: this.screen });
+    this.screen = screen;
   }
 }

@@ -208,11 +208,21 @@ digital_space/
 
 | File | Role |
 |------|------|
-| `core/constants/debug-logging.config.ts` | Master on/off switch (`DEBUG_LOGGING_ENABLED`) |
+| `core/constants/debug-logging.config.ts` | Two switches: `IMPORTANT_LOGGING_ENABLED` and `VERBOSE_LOGGING_ENABLED` |
 | `core/services/logger.util.ts` | Stack-aware logger (file, function, line, caller) |
 | `core/services/logger.service.ts` | Injectable wrapper for components/services |
 
-Set `DEBUG_LOGGING_ENABLED = true` in `debug-logging.config.ts`, reproduce Google sign-in, and read the browser console. Set back to `false` for production.
+| `IMPORTANT` | `VERBOSE` | What prints |
+|-------------|-----------|-------------|
+| `false` | `false` | Nothing |
+| `true` | `false` | Important only: `error`, `warn`, `info`, `important()` |
+| `true` | `true` | Everything: important + `enter` / `exit` / `step` / `debug` |
+
+**API convention:**
+- `log.important()` / `log.error()` / `log.warn()` — level 1 (always when IMPORTANT is on)
+- `log.enter()` / `log.exit()` / `log.step()` — level 2 (only when VERBOSE is also on)
+
+For Google sign-in debugging, set both to `true`. For production, set both to `false`.
 
 Log format example:
 
@@ -439,7 +449,7 @@ Production `baseHref` is `/digital_space/` (`angular.json`).
 2. Workflow builds, tests, and deploys `dist/digital-space/browser`.
 3. SPA fallback: `404.html` copy of `index.html`.
 
-Before deploy: set `DEBUG_LOGGING_ENABLED = false` in `debug-logging.config.ts`.
+Before deploy: set `IMPORTANT_LOGGING_ENABLED = false` and `VERBOSE_LOGGING_ENABLED = false` in `debug-logging.config.ts`.
 
 ---
 
@@ -483,7 +493,7 @@ npm run icons
 | `ERR_CONNECTION_REFUSED` on LAN IP | Use `npm run start:lan` |
 | Search dropdown clipped | Hard refresh; topbar uses global `shell-topbar.css` |
 | Welcome image missing | Add PNGs to `public/images/` |
-| Debug Google login | Set `DEBUG_LOGGING_ENABLED = true`; open DevTools Console |
+| Debug Google login | Set both logging flags to `true` in `debug-logging.config.ts`; open DevTools Console |
 
 ---
 

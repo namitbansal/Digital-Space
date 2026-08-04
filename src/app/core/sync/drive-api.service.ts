@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { EncryptedAttachmentRecord, VaultEnvelope, VaultRecoveryRecord, VaultCodeRecoveryRecord, VaultEmailRecoveryRecord } from '../models/vault.models';
 import { GoogleAccountService } from '../auth/google-account.service';
 import { APP_NAME } from '../constants/app-name';
+import { AppLogger } from '../services/logger.util';
 
 const DRIVE = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
@@ -31,7 +32,9 @@ export class DriveApiService {
     const res = await fetch(url, options);
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`Drive API ${res.status}: ${text.slice(0, 200)}`);
+      const message = `Drive API ${res.status}: ${text.slice(0, 200)}`;
+      AppLogger.error('DriveApiService.driveFetch failed', { status: res.status, message });
+      throw new Error(message);
     }
     if (res.status === 204) return null as T;
     const ct = res.headers.get('content-type') || '';
@@ -45,7 +48,8 @@ export class DriveApiService {
     const rootId = scope ? await this.ensureChildFolder(clientId, appRootId, scope) : appRootId;
     const attachmentsId = await this.ensureChildFolder(clientId, rootId, 'attachments');
     const backupsId = await this.ensureChildFolder(clientId, rootId, 'backups');
-    return { rootId, attachmentsId, backupsId, appRootId };
+    const layout = { rootId, attachmentsId, backupsId, appRootId };
+    return layout;
   }
 
   /** Folders under an existing vault root (scoped or legacy). */

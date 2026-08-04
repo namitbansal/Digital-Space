@@ -70,6 +70,6 @@ export class VaultStoreService {
     }
 
     this.db.setUserScope(prev);
-    return true;
+    return !userHas;
   }
 }

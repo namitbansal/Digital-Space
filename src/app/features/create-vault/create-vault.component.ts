@@ -3,8 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { googleErrorMessage } from '../../core/auth/google-errors';
 import { GoogleDriveLinkService } from '../../core/auth/google-drive-link.service';
 import {
+  clearCreateVaultDraft,
   clearPendingGoogleOAuth,
+  loadCreateVaultDraft,
   loadPendingGoogleOAuth,
+  saveCreateVaultDraft,
 } from '../../core/auth/google-oauth-redirect.util';
 import { GoogleOAuthConfigService } from '../../core/auth/google-oauth-config.service';
 import { APP_NAME } from '../../core/constants/app-name';
@@ -16,7 +19,7 @@ import { VaultService } from '../../core/services/vault.service';
 import { USERNAME_FORMAT_HINT, USERNAME_TAKEN_MESSAGE, usernameError } from '../../core/utils/username';
 import { describeDriveLayout } from '../../core/sync/drive-layout.util';
 import { GuidancePanelComponent } from '../../shared/guidance-panel/guidance-panel.component';
-import { LoggerService } from '../../core/services/logger.service';
+import { LoggerService } from '../../core/services/logger.util';
 
 type StorageChoice = 'device' | 'google';
 type CreateStep = 'form' | 'storage' | 'google' | 'recovery';
@@ -95,17 +98,46 @@ export class CreateVaultComponent {
   }
 
   async ngOnInit(): Promise<void> {
-    this.log.enter('CreateVaultComponent.ngOnInit');
     await this.loadGoogleConfig();
+    this.restoreCreateVaultDraft();
     await this.tryResumeGoogleFromRedirect();
-    this.log.exit('CreateVaultComponent.ngOnInit', { step: this.step });
+  }
+
+  private restoreCreateVaultDraft(): void {
+    const draft = loadCreateVaultDraft();
+    if (!draft) return;
+
+    this.loginUsername = draft.loginUsername;
+    this.userName = draft.userName;
+    this.recoveryCode = draft.recoveryCode;
+    this.storageChoice = draft.storageChoice;
+    this.syncToDrive = draft.syncToDrive;
+    if (this.step === 'form') {
+      this.step = draft.storageChoice === 'google' ? 'google' : 'recovery';
+    }
+  }
+
+  private persistCreateVaultDraft(): void {
+    if (!this.loginUsername || !this.recoveryCode) {
+      this.log.warn('CreateVaultComponent.persistCreateVaultDraft: skipped — missing username or recovery code');
+      return;
+    }
+    saveCreateVaultDraft({
+      loginUsername: this.loginUsername,
+      userName: this.userName,
+      recoveryCode: this.recoveryCode,
+      storageChoice: this.storageChoice,
+      syncToDrive: this.syncToDrive,
+    });
+  }
+
+  private goToStep(step: CreateStep, reason: string): void {
+    this.step = step;
   }
 
   private async tryResumeGoogleFromRedirect(): Promise<void> {
-    this.log.enter('CreateVaultComponent.tryResumeGoogleFromRedirect');
     const pending = loadPendingGoogleOAuth();
     if (!pending || pending.flow !== 'create-vault') {
-      this.log.exit('CreateVaultComponent.tryResumeGoogleFromRedirect', { skipped: true });
       return;
     }
 
@@ -115,12 +147,10 @@ export class CreateVaultComponent {
     if (pending.oauthError) {
       this.error = googleErrorMessage({ message: pending.oauthError });
       clearPendingGoogleOAuth();
-      this.log.exit('CreateVaultComponent.tryResumeGoogleFromRedirect', { oauthError: pending.oauthError });
       return;
     }
 
     if (!pending.accessToken) {
-      this.log.exit('CreateVaultComponent.tryResumeGoogleFromRedirect', { waitingForToken: true });
       return;
     }
 
@@ -133,12 +163,8 @@ export class CreateVaultComponent {
         this.identityId = result.id;
         this.driveVerified = result.driveVerified;
         this.driveFolderId = result.folderId || '';
-        this.log.step('Create-vault Google connect succeeded', {
-          email: result.email,
-          driveVerified: result.driveVerified,
-        });
+        this.goToStep('recovery', 'google oauth resume succeeded');
       }
-      this.log.exit('CreateVaultComponent.tryResumeGoogleFromRedirect', { success: Boolean(result) });
     } catch (e) {
       this.error = googleErrorMessage(
         e,
@@ -151,11 +177,9 @@ export class CreateVaultComponent {
   }
 
   private async loadGoogleConfig(): Promise<void> {
-    this.log.enter('CreateVaultComponent.loadGoogleConfig');
     const settings = await this.settings.load();
     this.googleClientId = await this.oauthConfig.resolve(settings.googleClientId);
     this.googleConfigured = Boolean(this.googleClientId);
-    this.log.exit('CreateVaultComponent.loadGoogleConfig', { googleConfigured: this.googleConfigured });
   }
 
   async checkUsername(): Promise<void> {
@@ -181,19 +205,23 @@ export class CreateVaultComponent {
     const loginErr = usernameError(this.loginUsername);
     if (loginErr) {
       this.error = loginErr;
+      this.log.warn('CreateVaultComponent.submit: invalid username', { loginErr });
       return;
     }
     const name = this.userName.trim();
     if (!name) {
       this.error = 'Please enter your display name.';
+      this.log.warn('CreateVaultComponent.submit: missing display name');
       return;
     }
     if (this.password !== this.confirm) {
       this.error = 'Passwords do not match.';
+      this.log.warn('CreateVaultComponent.submit: passwords do not match');
       return;
     }
     if (this.password.length < 8) {
       this.error = 'Use at least 8 characters for your Master Password.';
+      this.log.warn('CreateVaultComponent.submit: password too short');
       return;
     }
     this.busy = true;
@@ -203,17 +231,20 @@ export class CreateVaultComponent {
         if (!available.available) {
           this.error = USERNAME_TAKEN_MESSAGE;
           this.usernameHint = USERNAME_TAKEN_MESSAGE;
+          this.log.warn('CreateVaultComponent.submit: username taken', { username: this.loginUsername });
           return;
         }
       } catch {
         this.usernameHint = 'Could not verify username (registry offline). Continuing locally.';
+        this.log.warn('CreateVaultComponent.submit: registry offline — continuing locally');
       }
       const result = await this.vault.createVault(this.loginUsername, this.password, name);
       this.recoveryCode = result.recoveryCode;
       this.verifyPassword = this.password;
       this.password = '';
       this.confirm = '';
-      this.step = 'storage';
+      this.persistCreateVaultDraft();
+      this.goToStep('storage', 'vault created');
     } catch (e) {
       const code = (e as Error & { code?: string }).code;
       if (code === 'USERNAME_LOCAL_EXISTS') {
@@ -221,6 +252,7 @@ export class CreateVaultComponent {
       } else {
         this.error = e instanceof Error ? e.message : 'Could not create vault.';
       }
+      this.log.error('CreateVaultComponent.submit failed', { code, err: e });
     } finally {
       this.busy = false;
     }
@@ -228,31 +260,31 @@ export class CreateVaultComponent {
 
   continueFromStorage(): void {
     this.error = '';
-    this.step = this.wantsGoogleSync ? 'google' : 'recovery';
+    this.goToStep(this.wantsGoogleSync ? 'google' : 'recovery', 'storage choice confirmed');
   }
 
   continueFromGoogle(): void {
     this.error = '';
-    this.step = 'recovery';
+    this.goToStep('recovery', 'google step complete');
   }
 
   backFromGoogle(): void {
     this.error = '';
-    this.step = 'storage';
+    this.goToStep('storage', 'back from google');
   }
 
   backFromStorage(): void {
     this.error = '';
+    clearCreateVaultDraft();
     this.back.emit();
   }
 
   backFromRecovery(): void {
     this.error = '';
-    this.step = this.wantsGoogleSync ? 'google' : 'storage';
+    this.goToStep(this.wantsGoogleSync ? 'google' : 'storage', 'back from recovery');
   }
 
   connectGoogle(): void {
-    this.log.enter('CreateVaultComponent.connectGoogle');
     this.error = '';
     if (!this.resolvedGoogleClientId) {
       this.error = 'Google sign-in is not configured on this site.';
@@ -262,7 +294,7 @@ export class CreateVaultComponent {
 
     this.driveVerified = false;
     this.driveFolderId = '';
-    this.log.step('Starting create-vault Google redirect', { username: this.loginUsername });
+    this.persistCreateVaultDraft();
     this.googleLink.startRedirectConnect({
       clientId: this.resolvedGoogleClientId,
       username: this.loginUsername,
@@ -271,13 +303,10 @@ export class CreateVaultComponent {
       persist: false,
       flow: 'create-vault',
     });
-    this.log.exit('CreateVaultComponent.connectGoogle');
   }
 
   async verifyDriveAgain(): Promise<void> {
-    this.log.enter('CreateVaultComponent.verifyDriveAgain');
     if (!this.identityEmail || !this.resolvedGoogleClientId) {
-      this.log.exit('CreateVaultComponent.verifyDriveAgain', { skipped: true });
       return;
     }
     this.error = '';
@@ -286,7 +315,6 @@ export class CreateVaultComponent {
       const result = await this.googleLink.verifyDriveAccess(this.resolvedGoogleClientId, this.loginUsername);
       this.driveVerified = true;
       this.driveFolderId = result.folderId || '';
-      this.log.exit('CreateVaultComponent.verifyDriveAgain', { driveVerified: true, folderId: this.driveFolderId });
     } catch (e) {
       this.driveVerified = false;
       this.error = googleErrorMessage(e, this.hints.driveVerifyFailed);
@@ -304,6 +332,7 @@ export class CreateVaultComponent {
   async finishSetup(): Promise<void> {
     if (!this.savedCode) {
       this.error = 'Please confirm you saved your recovery code.';
+      this.log.warn('CreateVaultComponent.finishSetup: recovery code not confirmed');
       return;
     }
     await this.openVault();
@@ -313,11 +342,24 @@ export class CreateVaultComponent {
     this.error = '';
     if (!this.verifyPassword) {
       this.error = 'Enter your master password to confirm.';
+      this.log.warn('CreateVaultComponent.openVault: missing verify password');
+      return;
+    }
+    if (!this.loginUsername) {
+      this.error = 'Setup session expired. Go back and start again.';
+      this.log.error('CreateVaultComponent.openVault: missing username');
+      return;
+    }
+    if (!this.recoveryCode) {
+      this.error = 'Recovery code is missing. Go back and restart setup.';
+      this.log.error('CreateVaultComponent.openVault: missing recovery code');
       return;
     }
 
     this.busy = true;
     try {
+      await this.vault.unlockVault(this.loginUsername, this.verifyPassword);
+
       if (this.wantsGoogleSync && this.identityEmail && this.identityId) {
         await this.vault.completeGoogleOnboarding({
           masterPassword: this.verifyPassword,
@@ -340,11 +382,25 @@ export class CreateVaultComponent {
         });
       }
       this.verifyPassword = '';
+      clearCreateVaultDraft();
+      this.log.info('Create-vault setup complete', {
+        username: this.loginUsername,
+        googleSync: this.wantsGoogleSync && Boolean(this.identityEmail),
+      });
       this.created.emit();
     } catch (e) {
       const code = (e as Error & { code?: string }).code;
-      this.error =
-        code === 'WRONG_PASSWORD' ? 'Master password is incorrect.' : 'Could not finish setup. Try again.';
+      const message = e instanceof Error ? e.message : '';
+      if (code === 'WRONG_PASSWORD') {
+        this.error = 'Master password is incorrect.';
+      } else if (code === 'NO_GOOGLE_IDENTITY' || code === 'NO_DRIVE_ACCOUNT') {
+        this.error = 'Google account is not connected. Go back and connect Google again.';
+      } else if (message === 'LOCKED') {
+        this.error = 'Could not unlock your vault. Check your master password and try again.';
+      } else {
+        this.error = 'Could not finish setup. Try again.';
+      }
+      this.log.error('CreateVaultComponent.openVault failed', { code, message, err: e });
     } finally {
       this.busy = false;
     }

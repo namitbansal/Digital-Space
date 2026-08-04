@@ -24,82 +24,49 @@ export interface GoogleOAuthPendingRedirect {
 }
 
 export function getGoogleOAuthRedirectUri(): string {
-  AppLogger.enter('getGoogleOAuthRedirectUri');
   if (typeof window === 'undefined') {
-    AppLogger.exit('getGoogleOAuthRedirectUri', { redirectUri: 'http://localhost:5173/' });
     return 'http://localhost:5173/';
   }
   const origin = window.location.origin;
   const base = document.querySelector('base')?.getAttribute('href') || '/';
   if (!base || base === '/') {
-    const redirectUri = origin + '/';
-    AppLogger.exit('getGoogleOAuthRedirectUri', { redirectUri });
-    return redirectUri;
+    return origin + '/';
   }
   const path = base.startsWith('/') ? base : '/' + base;
-  const redirectUri = origin + (path.endsWith('/') ? path : path + '/');
-  AppLogger.exit('getGoogleOAuthRedirectUri', { redirectUri });
-  return redirectUri;
+  return origin + (path.endsWith('/') ? path : path + '/');
 }
 
 export function createOAuthState(): string {
-  AppLogger.enter('createOAuthState');
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
-  const state = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  AppLogger.exit('createOAuthState', { stateLength: state.length });
-  return state;
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export function loadPendingGoogleOAuth(): GoogleOAuthPendingRedirect | null {
-  AppLogger.enter('loadPendingGoogleOAuth');
   try {
     const raw = sessionStorage.getItem(GOOGLE_OAUTH_PENDING_KEY);
-    if (!raw) {
-      AppLogger.step('No pending OAuth state in sessionStorage');
-      AppLogger.exit('loadPendingGoogleOAuth', null);
-      return null;
-    }
-    const pending = JSON.parse(raw) as GoogleOAuthPendingRedirect;
-    AppLogger.exit('loadPendingGoogleOAuth', {
-      flow: pending.flow,
-      hasToken: Boolean(pending.accessToken),
-      hasError: Boolean(pending.oauthError),
-    });
-    return pending;
+    if (!raw) return null;
+    return JSON.parse(raw) as GoogleOAuthPendingRedirect;
   } catch (e) {
     AppLogger.error('Failed to parse pending OAuth state', e);
-    AppLogger.exit('loadPendingGoogleOAuth', null);
     return null;
   }
 }
 
 export function savePendingGoogleOAuth(pending: GoogleOAuthPendingRedirect): void {
-  AppLogger.enter('savePendingGoogleOAuth', {
-    flow: pending.flow,
-    hasToken: Boolean(pending.accessToken),
-    hasError: Boolean(pending.oauthError),
-  });
   sessionStorage.setItem(GOOGLE_OAUTH_PENDING_KEY, JSON.stringify(pending));
-  AppLogger.exit('savePendingGoogleOAuth');
 }
 
 export function clearPendingGoogleOAuth(): void {
-  AppLogger.enter('clearPendingGoogleOAuth');
   sessionStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY);
-  AppLogger.exit('clearPendingGoogleOAuth');
 }
 
 export function hasPendingGoogleOAuthWithToken(): boolean {
-  AppLogger.enter('hasPendingGoogleOAuthWithToken');
   const pending = loadPendingGoogleOAuth();
-  const result = Boolean(pending?.accessToken && !pending.oauthError);
-  AppLogger.exit('hasPendingGoogleOAuthWithToken', { result });
-  return result;
+  return Boolean(pending?.accessToken && !pending.oauthError);
 }
 
 export function buildGoogleImplicitAuthUrl(clientId: string, state: string, selectAccount: boolean): string {
-  AppLogger.enter('buildGoogleImplicitAuthUrl', { selectAccount, stateLength: state.length });
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: getGoogleOAuthRedirectUri(),
@@ -109,28 +76,17 @@ export function buildGoogleImplicitAuthUrl(clientId: string, state: string, sele
     include_granted_scopes: 'true',
   });
   if (selectAccount) params.set('prompt', 'select_account');
-  const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
-  AppLogger.exit('buildGoogleImplicitAuthUrl', { redirectUri: params.get('redirect_uri') });
-  return url;
+  return 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
 }
 
 /** Call once on page load — captures #access_token from same-tab OAuth redirect. */
 export function captureGoogleOAuthRedirectFromUrl(): void {
-  AppLogger.enter('captureGoogleOAuthRedirectFromUrl');
   const hash = window.location.hash;
-  if (!hash || hash.length < 2) {
-    AppLogger.step('No OAuth hash in URL');
-    AppLogger.exit('captureGoogleOAuthRedirectFromUrl', { captured: false });
-    return;
-  }
+  if (!hash || hash.length < 2) return;
 
   const params = new URLSearchParams(hash.slice(1));
   const state = params.get('state');
-  if (!state) {
-    AppLogger.step('Hash present but no state parameter');
-    AppLogger.exit('captureGoogleOAuthRedirectFromUrl', { captured: false });
-    return;
-  }
+  if (!state) return;
 
   const pending = loadPendingGoogleOAuth();
   if (!pending || pending.state !== state) {
@@ -138,7 +94,6 @@ export function captureGoogleOAuthRedirectFromUrl(): void {
       hasPending: Boolean(pending),
       stateMatch: pending?.state === state,
     });
-    AppLogger.exit('captureGoogleOAuthRedirectFromUrl', { captured: false });
     return;
   }
 
@@ -151,33 +106,22 @@ export function captureGoogleOAuthRedirectFromUrl(): void {
     });
     savePendingGoogleOAuth(pending);
     stripOAuthHashFromUrl();
-    AppLogger.exit('captureGoogleOAuthRedirectFromUrl', { captured: false, oauthError: pending.oauthError });
     return;
   }
 
   const accessToken = params.get('access_token');
-  if (!accessToken) {
-    AppLogger.step('OAuth hash has state but no access_token yet');
-    AppLogger.exit('captureGoogleOAuthRedirectFromUrl', { captured: false });
-    return;
-  }
+  if (!accessToken) return;
 
   pending.accessToken = accessToken;
   pending.expiresIn = Number(params.get('expires_in') || 3600);
-  AppLogger.step('Captured access token from redirect', {
-    flow: pending.flow,
-    expiresIn: pending.expiresIn,
-  });
+  AppLogger.info('Google OAuth token captured', { flow: pending.flow });
   savePendingGoogleOAuth(pending);
   stripOAuthHashFromUrl();
-  AppLogger.exit('captureGoogleOAuthRedirectFromUrl', { captured: true, flow: pending.flow });
 }
 
 function stripOAuthHashFromUrl(): void {
-  AppLogger.enter('stripOAuthHashFromUrl');
   const path = window.location.pathname + window.location.search;
   window.history.replaceState(null, '', path);
-  AppLogger.exit('stripOAuthHashFromUrl', { path });
 }
 
 export function startGoogleOAuthRedirect(input: {
@@ -189,14 +133,6 @@ export function startGoogleOAuthRedirect(input: {
   flow: GoogleOAuthPendingFlow;
   openSettings?: boolean;
 }): void {
-  AppLogger.enter('startGoogleOAuthRedirect', {
-    flow: input.flow,
-    verifyDrive: input.verifyDrive,
-    persist: input.persist,
-    selectAccount: input.selectAccount,
-    openSettings: input.openSettings,
-    username: input.username,
-  });
   const state = createOAuthState();
   savePendingGoogleOAuth({
     state,
@@ -209,38 +145,62 @@ export function startGoogleOAuthRedirect(input: {
     openSettings: input.openSettings,
     createdAt: Date.now(),
   });
-  const authUrl = buildGoogleImplicitAuthUrl(input.clientId, state, input.selectAccount);
-  AppLogger.step('Redirecting browser to Google OAuth', { redirectUri: getGoogleOAuthRedirectUri() });
-  window.location.assign(authUrl);
+  window.location.assign(buildGoogleImplicitAuthUrl(input.clientId, state, input.selectAccount));
 }
 
 export function stashGoogleOAuthUiMessage(success?: string, error?: string): void {
-  AppLogger.enter('stashGoogleOAuthUiMessage', { hasSuccess: Boolean(success), hasError: Boolean(error) });
-  if (!success && !error) {
-    AppLogger.exit('stashGoogleOAuthUiMessage', { stashed: false });
-    return;
-  }
+  if (!success && !error) return;
   sessionStorage.setItem(GOOGLE_OAUTH_UI_KEY, JSON.stringify({ success: success || '', error: error || '' }));
-  AppLogger.exit('stashGoogleOAuthUiMessage', { stashed: true });
 }
 
 export function consumeGoogleOAuthUiMessage(): { success: string; error: string } | null {
-  AppLogger.enter('consumeGoogleOAuthUiMessage');
   try {
     const raw = sessionStorage.getItem(GOOGLE_OAUTH_UI_KEY);
     sessionStorage.removeItem(GOOGLE_OAUTH_UI_KEY);
-    if (!raw) {
-      AppLogger.exit('consumeGoogleOAuthUiMessage', null);
-      return null;
-    }
+    if (!raw) return null;
     const parsed = JSON.parse(raw) as { success?: string; error?: string };
-    const message = { success: parsed.success || '', error: parsed.error || '' };
-    AppLogger.exit('consumeGoogleOAuthUiMessage', message);
-    return message;
+    return { success: parsed.success || '', error: parsed.error || '' };
   } catch (e) {
     AppLogger.error('Failed to consume OAuth UI message', e);
     sessionStorage.removeItem(GOOGLE_OAUTH_UI_KEY);
-    AppLogger.exit('consumeGoogleOAuthUiMessage', null);
     return null;
   }
+}
+
+// --- Create-vault wizard state (survives OAuth redirect) ---
+
+export const CREATE_VAULT_DRAFT_KEY = 'digital-space-create-vault-draft';
+
+export type CreateVaultDraftStorageChoice = 'device' | 'google';
+
+export interface CreateVaultDraft {
+  loginUsername: string;
+  userName: string;
+  recoveryCode: string;
+  storageChoice: CreateVaultDraftStorageChoice;
+  syncToDrive: boolean;
+  createdAt: number;
+}
+
+export function saveCreateVaultDraft(draft: Omit<CreateVaultDraft, 'createdAt'>): void {
+  sessionStorage.setItem(
+    CREATE_VAULT_DRAFT_KEY,
+    JSON.stringify({ ...draft, createdAt: Date.now() } satisfies CreateVaultDraft),
+  );
+}
+
+export function loadCreateVaultDraft(): CreateVaultDraft | null {
+  try {
+    const raw = sessionStorage.getItem(CREATE_VAULT_DRAFT_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as CreateVaultDraft;
+    return draft.loginUsername && draft.recoveryCode ? draft : null;
+  } catch (e) {
+    AppLogger.error('Failed to parse create-vault draft', e);
+    return null;
+  }
+}
+
+export function clearCreateVaultDraft(): void {
+  sessionStorage.removeItem(CREATE_VAULT_DRAFT_KEY);
 }

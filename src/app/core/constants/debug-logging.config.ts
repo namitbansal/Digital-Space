@@ -1,5 +1,17 @@
 /**
- * Master switch for application debug logging.
- * Set to `true` to print logs; set to `false` to silence all logger output.
+ * Two-level logging switches.
+ *
+ * Level 1 — IMPORTANT (`IMPORTANT_LOGGING_ENABLED`):
+ *   error, warn, important() — failures, warnings, and key milestones.
+ *
+ * Level 2 — VERBOSE (`VERBOSE_LOGGING_ENABLED`, requires IMPORTANT on):
+ *   enter(), exit(), step(), debug() — full step-by-step flow trace.
+ *
+ * | IMPORTANT | VERBOSE | What prints                          |
+ * |-----------|---------|--------------------------------------|
+ * | false     | false   | Nothing (production default)         |
+ * | true      | false   | Important only                       |
+ * | true      | true    | Important + verbose trace            |
  */
-export const DEBUG_LOGGING_ENABLED = !false;
+export const IMPORTANT_LOGGING_ENABLED = false;
+export const VERBOSE_LOGGING_ENABLED = false;

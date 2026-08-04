@@ -9,6 +9,7 @@ import { VaultStoreService } from '../storage/vault-store.service';
 import { nowIso } from '../utils/id';
 import { VaultService } from '../services/vault.service';
 import { DriveApiService } from './drive-api.service';
+import { AppLogger } from '../services/logger.util';
 
 export type SyncStatusKind = 'idle' | 'syncing' | 'ok' | 'error' | 'conflict' | 'offline';
 
@@ -42,10 +43,15 @@ export class SyncService {
   private onlineListener: (() => void) | null = null;
 
   init(): void {
-    if (typeof window === 'undefined' || this.onlineListener) return;
+    if (typeof window === 'undefined' || this.onlineListener) {
+      return;
+    }
     this.onlineListener = () => {
-      if (navigator.onLine) void this.scheduleAutoSync();
-      else this.setState({ status: 'offline', message: 'Offline — changes saved on this device' });
+      if (navigator.onLine) {
+        void this.scheduleAutoSync();
+      } else {
+        this.setState({ status: 'offline', message: 'Offline — changes saved on this device' });
+      }
     };
     window.addEventListener('online', this.onlineListener);
     window.addEventListener('offline', this.onlineListener);
@@ -93,10 +99,14 @@ export class SyncService {
     const key = this.session.key;
     const localVault = this.session.vault;
     const localEnvelope = this.session.envelope;
-    if (!key || !localVault || !localEnvelope) return;
+    if (!key || !localVault || !localEnvelope) {
+      return;
+    }
 
     const clientId = sync?.googleClientId?.trim();
-    if (!clientId || !sync?.googleAccountEmail) return;
+    if (!clientId || !sync?.googleAccountEmail) {
+      return;
+    }
 
     this.setState({ status: 'syncing', message: 'Checking Google Drive for updates…', lastSyncedAt: sync.lastSyncedAt ?? null });
     try {
@@ -128,12 +138,14 @@ export class SyncService {
           message: 'Synced from Google Drive (newer backup loaded)',
           lastSyncedAt: syncedAt,
         });
+        AppLogger.info('Sync pull complete — remote vault loaded', { syncedAt });
         return;
       }
 
       await this.pushSync(true);
       await this.pullAttachments(clientId, layout.attachmentsId);
-    } catch {
+    } catch (e) {
+      AppLogger.error('SyncService.mergeOnLogin failed', e);
       this.setState({ status: 'error', message: 'Sync on login failed — using data on this device' });
     }
   }
@@ -171,7 +183,6 @@ export class SyncService {
     });
   }
 
-  /** Upload encrypted vault to Google Drive (never plaintext). */
   async pushSync(autoMerge = false): Promise<{ ok: boolean; skipped?: boolean; reason?: string }> {
     const sync = this.session.vault?.sync;
     if (!this.shouldSync(sync)) {
@@ -214,6 +225,7 @@ export class SyncService {
         !autoMerge &&
         this.remoteIsNewer(localUpdatedAt, localRevision, remoteUpdatedAt, remoteRevision)
       ) {
+        AppLogger.warn('SyncService.pushSync: conflict — remote is newer');
         await this.drive.backupEnvelope(clientId, layout.backupsId, envelope, `local-${Date.now()}`);
         this.setState({
           status: 'conflict',
@@ -235,17 +247,20 @@ export class SyncService {
       });
       await this.vaultService().updateSyncAccount({ driveFolderId: layout.rootId, lastSyncedAt: syncedAt }, { skipAudit: true });
       this.setState({ status: 'ok', message: 'Synced to Google Drive (fully encrypted)', lastSyncedAt: syncedAt });
+      AppLogger.info('Sync push complete', { syncedAt });
       return { ok: true };
-    } catch {
+    } catch (e) {
+      AppLogger.error('SyncService.pushSync failed', e);
       this.setState({ status: 'error', message: 'Sync failed — your data is still safe on this device' });
       return { ok: false, reason: 'ERROR' };
     }
   }
 
-  /** Download encrypted vault from Google Drive into local storage. Re-unlock required. */
   async pullSync(force = false): Promise<{ ok: boolean; imported?: boolean; skipped?: boolean; reason?: string }> {
     const sync = this.session.vault?.sync;
-    if (!this.shouldSync(sync)) return { ok: true, skipped: true };
+    if (!this.shouldSync(sync)) {
+      return { ok: true, skipped: true };
+    }
     if (!this.isOnline()) {
       this.setState({ status: 'offline', message: 'Offline — cannot download from Google Drive' });
       return { ok: false, reason: 'OFFLINE' };
@@ -275,6 +290,7 @@ export class SyncService {
       const remoteRev = await readVaultRevision(key, remote);
 
       if (local && localRev > remoteRev && !force) {
+        AppLogger.warn('SyncService.pullSync: conflict — local is newer');
         await this.drive.backupEnvelope(clientId, layout.backupsId, remote, `remote-${Date.now()}`);
         this.setState({
           status: 'conflict',
@@ -298,8 +314,10 @@ export class SyncService {
       });
       await this.vaultService().updateSyncAccount({ driveFolderId: vaultRootId, lastSyncedAt: syncedAt }, { skipAudit: true });
       this.setState({ status: 'ok', message: 'Downloaded — lock and unlock to load', lastSyncedAt: syncedAt });
+      AppLogger.info('Sync pull complete', { force, syncedAt });
       return { ok: true, imported: true };
-    } catch {
+    } catch (e) {
+      AppLogger.error('SyncService.pullSync failed', e);
       this.setState({ status: 'error', message: 'Download failed' });
       return { ok: false, reason: 'ERROR' };
     }

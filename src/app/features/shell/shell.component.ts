@@ -5,7 +5,7 @@ import { AttachmentMeta, CustomField, Folder, Profile, VaultItem } from '../../c
 import { AttachmentService } from '../../core/services/attachment.service';
 import { VaultService } from '../../core/services/vault.service';
 import { GoogleDriveLinkService } from '../../core/auth/google-drive-link.service';
-import { LoggerService } from '../../core/services/logger.service';
+import { LoggerService } from '../../core/services/logger.util';
 import { AccountSettingsComponent } from '../account-settings/account-settings.component';
 import { ActivityHistoryComponent } from '../activity-history/activity-history.component';
 import { GuidanceId } from '../../core/constants/page-guidance';
@@ -128,17 +128,13 @@ export class ShellComponent implements OnInit {
   }
 
   private async resumeGoogleOAuth(): Promise<void> {
-    this.log.enter('ShellComponent.resumeGoogleOAuth');
     const resume = await this.googleLink.resumePendingConnect();
     if (!resume) {
-      this.log.exit('ShellComponent.resumeGoogleOAuth', { resumed: false });
       return;
     }
-    this.log.step('OAuth resume result', resume);
     if (resume.openSettings) {
       this.showSettingsModal = true;
     }
-    this.log.exit('ShellComponent.resumeGoogleOAuth', { resumed: true, openSettings: resume.openSettings });
   }
 
   refresh(): void {
@@ -792,6 +788,7 @@ export class ShellComponent implements OnInit {
 
   async lock(): Promise<void> {
     await this.vault.lockVault('manual');
+    this.log.info('User locked vault from shell');
     this.locked.emit();
   }
 

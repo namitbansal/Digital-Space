@@ -5,6 +5,7 @@ import { GuidancePanelComponent } from '../../shared/guidance-panel/guidance-pan
 import { EmailRecoveryApiService } from '../../core/services/email-recovery-api.service';
 import { UserContextService } from '../../core/services/user-context.service';
 import { VaultService } from '../../core/services/vault.service';
+import { LoggerService } from '../../core/services/logger.util';
 import { usernameError } from '../../core/utils/username';
 
 @Component({
@@ -18,6 +19,7 @@ export class ForgotPasswordComponent implements OnInit {
   private readonly vault = inject(VaultService);
   private readonly emailRecoveryApi = inject(EmailRecoveryApiService);
   private readonly users = inject(UserContextService);
+  private readonly log = inject(LoggerService);
 
   @Output() reset = new EventEmitter<void>();
   @Output() back = new EventEmitter<void>();
@@ -52,7 +54,7 @@ export class ForgotPasswordComponent implements OnInit {
         this.recoveryEmail = profile.recoveryEmail;
       }
     } catch {
-      /* registry offline — user can enter email manually */
+      this.log.warn('ForgotPasswordComponent.loadRegistryHints: registry offline');
     }
   }
 
@@ -68,6 +70,7 @@ export class ForgotPasswordComponent implements OnInit {
     const email = this.recoveryEmail.trim().toLowerCase();
     if (!email || !email.includes('@')) {
       this.error = 'No recovery email on file. Set up your account with a linked email first.';
+      this.log.warn('ForgotPasswordComponent.sendEmailPin: invalid email');
       return;
     }
 
@@ -78,16 +81,16 @@ export class ForgotPasswordComponent implements OnInit {
       this.pinHint = res.devPin
         ? `Dev mode: your code is ${res.devPin} (also printed in recovery-api console).`
         : `A 6-digit code was sent to ${email}. It expires in ${Math.round(res.expiresInSeconds / 60)} minutes.`;
-    } catch {
+    } catch (e) {
       this.error =
         'Could not send recovery email. Start the recovery API (npm run start:api) and check SMTP settings.';
+      this.log.error('ForgotPasswordComponent.sendEmailPin failed', e);
     } finally {
       this.pinBusy = false;
     }
   }
 
   async submit(): Promise<void> {
-    this.error = '';
     this.success = '';
     if (!this.newPassword || this.newPassword.length < 8) {
       this.error = 'New password must be at least 8 characters.';
@@ -138,10 +141,12 @@ export class ForgotPasswordComponent implements OnInit {
       this.recoveryCode = '';
       this.emailPin = '';
       this.success = 'Master password updated. Opening your vault…';
+      this.log.info('Forgot-password reset complete', { username: this.username, mode: this.mode });
       this.reset.emit();
     } catch (err) {
       const httpError = (err as { error?: { error?: string } })?.error?.error;
       const code = httpError || (err as Error & { code?: string }).code;
+      this.log.error('ForgotPasswordComponent.submit failed', { code, err });
       if (code === 'INVALID_RECOVERY_CODE' || code === 'CODE_RECOVERY_NOT_FOUND') {
         this.error = 'Recovery code is incorrect or no recovery file exists on this device.';
       } else if (code === 'MASTER_RECOVERY_NOT_FOUND') {

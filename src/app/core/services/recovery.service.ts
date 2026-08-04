@@ -77,7 +77,8 @@ export class RecoveryService {
       err.code = 'CODE_RECOVERY_NOT_FOUND';
       throw err;
     }
-    return openCodeRecoveryRecord(codeRecord, recoveryCode);
+    const key = await openCodeRecoveryRecord(codeRecord, recoveryCode);
+    return key;
   }
 
   async unlockVaultKeyFromMasterCode(record?: VaultCodeRecoveryRecord | null): Promise<CryptoKey> {
@@ -107,7 +108,8 @@ export class RecoveryService {
       err.code = 'EMAIL_RECOVERY_NOT_FOUND';
       throw err;
     }
-    return openEmailRecoveryRecord(emailRecord, email);
+    const key = await openEmailRecoveryRecord(emailRecord, email);
+    return key;
   }
 
   async uploadGoogleRecovery(clientId: string, rootFolderId: string, vaultKey: CryptoKey, googleAccountId: string): Promise<void> {
@@ -121,7 +123,9 @@ export class RecoveryService {
 
   async uploadCodeRecoveryToDrive(clientId: string, rootFolderId: string): Promise<void> {
     const bundle = await this.loadBundle();
-    if (!bundle?.codeRecord) return;
+    if (!bundle?.codeRecord) {
+      return;
+    }
     await this.drive.uploadCodeRecoveryEnc(clientId, rootFolderId, bundle.codeRecord);
     if (bundle.masterCodeRecord) {
       await this.drive.uploadMasterCodeRecoveryEnc(clientId, rootFolderId, bundle.masterCodeRecord);
@@ -159,6 +163,7 @@ export class RecoveryService {
       throw err;
     }
     const identityId = record.googleAccountId || googleAccountId;
-    return openRecoveryRecord(record, identityId);
+    const key = await openRecoveryRecord(record, identityId);
+    return key;
   }
 }

@@ -5,7 +5,6 @@ import { firstValueFrom } from 'rxjs';
 export interface SendPinResponse {
   sent: boolean;
   expiresInSeconds: number;
-  /** Only present when SMTP is not configured (local dev). */
   devPin?: string;
 }
 
